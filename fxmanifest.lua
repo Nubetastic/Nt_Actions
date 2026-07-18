@@ -1,6 +1,10 @@
 game 'rdr3'
 fx_version 'adamant'
 rdr3_warning 'I acknowledge that this is a prerelease build of RedM, and I am aware my resources *will* become incompatible once RedM ships.'
+
+description 'A single multi action menu'
+version '1.0.0'
+
 dependencies { 'ox_lib' }
 
 
@@ -16,3 +20,6 @@ client_scripts {
 }
 
 
+server_scripts {
+    'server/versionchecker.lua'
+}

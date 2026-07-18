@@ -36,10 +36,11 @@ ConfigGroups.Scenario = {
                 {"PROP_HUMAN_SEAT_BENCH_MANDOLIN_UPBEAT", "female"},
             },
             ["Drinking / Smoking"] = {
-                {"PROP_HUMAN_SEAT_CHAIR_CIGAR", ""},
                 {"PROP_HUMAN_SEAT_CHAIR_DRINKING_MOONSHINE", ""},
-                {"PROP_HUMAN_SEAT_CHAIR_SMOKING", ""},
                 {"PROP_HUMAN_SEAT_BENCH_PORCH_DRINKING_MOONSHINE", ""},
+                {"PROP_HUMAN_SEAT_CHAIR_CIGAR", ""},
+                {"PROP_HUMAN_SEAT_CHAIR_SMOKING", ""},
+                {"PROP_HUMAN_SEAT_CHAIR_SMOKE_ROLL", ""},
             },
             ["Other Activities"] = {
                 {"PROP_HUMAN_SEAT_CHAIR_FAN", "female"},

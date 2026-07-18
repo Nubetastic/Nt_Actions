@@ -1,6 +1,6 @@
 # Nt_Actions
 
-A RedM resource providing interactive action menu.
+A RedM resource providing a unified action menu.
 Some scenarios in the config do not work, working on filtering the config more.
 
 ## Features
