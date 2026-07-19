@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="style.css">
+    <title>Scenario Fine Tune</title>
+</head>
+<body>
+    <aside id="navigation" aria-hidden="true">
+        <div class="nav-panel menu-surface">
+            <header class="nav-header">
+                <div class="nav-ornament">&#10022;</div>
+                <h1 id="nav-title">Menu</h1>
+                <div class="nav-ornament">&#10022;</div>
+            </header>
+            <div id="nav-options" class="nav-options"></div>
+            <div id="nav-scale-control" class="nav-scale-control">
+                <label for="nav-scale">Menu scale</label>
+                <input id="nav-scale" class="slider" type="range" min="0.75" max="1.25" step="0.05" value="1">
+                <output id="nav-scale-value">1.00x</output>
+            </div>
+            <div id="nav-description" class="nav-description" aria-live="polite"></div>
+            <footer class="nav-footer">
+                <button id="nav-back" type="button">Back</button>
+                <button id="nav-close" type="button">Close</button>
+            </footer>
+            <div class="nav-help">Arrow keys to navigate &bull; Enter to select</div>
+        </div>
+    </aside>
+    <main id="fine-tune" aria-hidden="true">
+        <div class="panel menu-surface">
+            <div class="title">Fine tune position</div>
+            <div class="control-row">
+                <section class="control-group">
+                    <div class="control-label">Position</div>
+                    <div class="arrows" aria-label="Position controls">
+                        <button class="up" data-direction="up" aria-label="Move forward">&#9650;</button>
+                        <button class="left" data-direction="left" aria-label="Move left">&#9664;</button>
+                        <button class="down" data-direction="down" aria-label="Move backward">&#9660;</button>
+                        <button class="right" data-direction="right" aria-label="Move right">&#9654;</button>
+                    </div>
+                </section>
+                <section class="control-group">
+                    <div class="control-label">Height</div>
+                    <div class="height" aria-label="Height controls">
+                        <button data-direction="raise" aria-label="Move up">&#8679;</button>
+                        <button data-direction="lower" aria-label="Move down">&#8681;</button>
+                    </div>
+                </section>
+                <section class="control-group">
+                    <div class="control-label">Rotation: <span id="heading-value">0&deg;</span></div>
+                    <div class="rotation" aria-label="Rotation controls">
+                        <button data-rotation="counterclockwise" aria-label="Rotate counterclockwise">&#8634;</button>
+                        <button data-rotation="clockwise" aria-label="Rotate clockwise">&#8635;</button>
+                    </div>
+                </section>
+            </div>
+            <div class="slider-row">
+                <label for="movement-step">Step per click</label>
+                <input id="movement-step" class="slider" type="range" min="0.005" max="0.25" step="0.005" value="0.025">
+                <output id="movement-value">0.025 m / 5&deg;</output>
+            </div>
+            <div class="slider-row">
+                <label for="camera-zoom">Camera zoom</label>
+                <input id="camera-zoom" class="slider" type="range" min="0.75" max="8" step="0.25" value="3">
+                <output id="camera-zoom-value">3.00 m</output>
+            </div>
+            <div class="camera-hint">Hold right mouse button to orbit the camera around the player</div>
+            <label class="save"><input id="save-offset" type="checkbox" checked> Save for this object and group</label>
+            <div class="actions">
+                <button id="cancel" class="secondary">Cancel</button>
+                <button id="confirm" class="confirm">&#10003; Confirm</button>
+            </div>
+        </div>
+    </main>
+    <script src="app.js"></script>
+</body>
+</html>

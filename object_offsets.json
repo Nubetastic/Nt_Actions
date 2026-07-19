@@ -1,0 +1,20 @@
+{
+    "-2062900430": {
+        "Sitting": {
+            "y": 0.05,
+            "z": 0.5,
+            "group": "Sitting",
+            "heading": 180.0,
+            "model": -2062900430,
+            "x": 0.615
+        },
+        "PROP_HUMAN_SLEEP_BED_PILLOW": {
+            "y": -0.04499999999999,
+            "z": 0.5,
+            "group": "PROP_HUMAN_SLEEP_BED_PILLOW",
+            "x": 0.0,
+            "model": -2062900430,
+            "heading": 93.0
+        }
+    }
+}

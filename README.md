@@ -13,7 +13,7 @@ Some scenarios in the config do not work, working on filtering the config more.
     - On point anchors the player to the item, it uses scenario point.
 - Leave and Unstuck
   - Leave ends the scenario normally, unstuck teleports you back to your original coords.
-  
+
 - **Gun Twirl Tricks**: Press **Page Down** to trigger and manage gun trick emotes
   - Multiple twirl animations (standard, dual, and variants A-B-D)
   - Navigate tricks with arrow keys (Up/Down)
@@ -21,9 +21,14 @@ Some scenarios in the config do not work, working on filtering the config more.
 
 - **rsg-animations button**: Added a menu button for rsg-animations for easy unified access.
 
+- **Object Target**: Select an object with ox_target, choose a scenario group and pose, then fine tune the player position with on-screen arrows. Confirming with the save checkbox enabled stores the object-model/group offset in `object_offsets.json` for future use.
+
+- **Custom NUI**: All action, scenario, pose, emote, and object-target navigation uses the same right-side menu and `html/assets/background.png` artwork.
+
 ## Dependencies
 
 - **[ox_lib](https://github.com/overextended/ox_lib)** - UI library for creating interactive menus (required)
+- **[ox_target](https://github.com/overextended/ox_target)** - One-use object selection for positioned scenarios (required)
 - **[rsg-animations](https://github.com/Rexshack-RedM/rsg-animations)** - can be changed in config to another frameworks.
 
 ## Installation
@@ -33,6 +38,7 @@ Some scenarios in the config do not work, working on filtering the config more.
 3. Add to your server config:
    ```lua
    ensure ox_lib
+   ensure ox_target
    ensure Nt_Actions
    ```
 
@@ -41,6 +47,13 @@ Some scenarios in the config do not work, working on filtering the config more.
 ### Scenario Menu
 - Press **L** while in-game to open the scenario menu
 - Select a scenario from the nearby list or your current group
+- Select **Object Target**, target an object once, then choose a group and scenario
+- Use the position arrows, height controls, shared movement/rotation step slider, and rotation buttons to align the scenario; confirm to keep playing and optionally save that offset
+- Fine tuning preserves the current gameplay-camera pitch and places the scripted camera behind the player using the selected scenario heading; hold right mouse to orbit it
+- The positioning camera starts at a distance equal to `MaxOffset`; use the camera zoom slider to change its orbit distance
+- Fine-tune controls immediately reapply the scenario at its updated position and heading
+
+Object targeting labels, distance, movement step, maximum offset, and default X/Y/Z/heading offsets can be changed in `shared/configTarget.lua`.
 
 ### Gun Tricks
 - Press **Page Down** to start the gun trick interface

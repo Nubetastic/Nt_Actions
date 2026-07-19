@@ -45,6 +45,10 @@ CachedPlayerOffset = CachedPlayerOffset or nil    -- {x,y,z} offset from scenari
 -- Menu open state
 local isMenuOpen = false
 
+AddEventHandler('nt_actions:client:setMenuOpen', function(value)
+    isMenuOpen = value == true
+end)
+
 -- Debounce U key
 local lastOpenTs = 0
 local function isOpenPressed()
@@ -93,7 +97,7 @@ end
 local ScenarioHashToDef = {}
 local function BuildScenarioHashIndex()
     ScenarioHashToDef = {}
-    for _, v in ipairs(Config.Scenarios or {}) do
+    for _, v in ipairs((ConfigScenarios and ConfigScenarios.Scenarios) or {}) do
         local name = v[1]
         local label = (v[2] and v[2] ~= "") and v[2] or v[1]
         ScenarioHashToDef[GetHashKey(name)] = {name=name, label=label}
@@ -231,13 +235,22 @@ local function CollectNearbyScenarioElements(radius)
 end
 
 local function BuildFirstMenu()
-    return {
-        { label = "Nearest Task", args = { action = 'nearest' } },
-        { label = "On Point", args = { action = 'on_point' } },
-        { label = "Do Action", args = { action = 'do_action' } },
-        { label = "GunTwirl", args = { action = 'guntwirl' } },
-        { label = Config.EmotesButton, args = { action = 'event_anim' } },
-    }
+    local options = {}
+
+    for _, button in ipairs(Config.MainMenuButtons or {}) do
+        local hasEmotesEvent = type(Config.EmotesEvent) == 'string' and Config.EmotesEvent:match('%S') ~= nil
+        local shouldShow = button.action ~= 'event_anim' or hasEmotesEvent
+
+        if shouldShow then
+            options[#options + 1] = {
+                label = button.label,
+                description = button.description,
+                args = { action = button.action },
+            }
+        end
+    end
+
+    return options
 end
 
 local function BuildEmotesMenu()
@@ -411,52 +424,43 @@ local function BuildCategoryMenu(categoryName)
 end
 
 local function OpenFirstMenu()
-    exports.ox_lib:registerMenu({
-        id = 'scenario_first',
-        title = 'Scenarios',
-        position = 'top-right',
-        options = BuildFirstMenu(),
-        canClose = true
-    }, function(selected, scrollIndex, args)
+    NtMenu.open('Scenarios', BuildFirstMenu(), function(selected, args)
         if args.action == 'nearest' then
             local nearby = CollectNearbyScenarioElements(1.5)
             if #nearby == 0 then
                 return
             end
-            exports.ox_lib:hideMenu()
+            NtMenu.hide(false)
             isMenuOpen = false
             UseNearestScenario()
         elseif args.action == 'do_action' then
             OpenActionMenu('do_action')
         elseif args.action == 'on_point' then
             OpenActionMenu('on_point')
+        elseif args.action == 'object_target' then
+            NtMenu.hide(false)
+            isMenuOpen = false
+            TriggerEvent('nt_actions:client:startObjectTarget')
         elseif args.action == 'guntwirl' then
-            exports.ox_lib:hideMenu()
+            NtMenu.hide(false)
             isMenuOpen = false
             TriggerEvent('ricx_guntwirl:toggleTwirl')
         elseif args.action == 'event_anim' then
-            exports.ox_lib:hideMenu()
+            NtMenu.hide(false)
             isMenuOpen = false
             TriggerServerEvent(Config.EmotesEvent)
         end
-    end)
-
-    exports.ox_lib:showMenu('scenario_first')
+    end, nil, { showScale = true })
     isMenuOpen = true
 end
 
 
 
 function OpenActionMenu(actionType)
-    exports.ox_lib:registerMenu({
-        id = 'scenario_action',
-        title = actionType == 'nearest' and 'Nearest Task' or (actionType == 'do_action' and 'Do Action' or 'On Point'),
-        position = 'top-right',
-        options = BuildActionMenu(actionType),
-        canClose = true
-    }, function(selected, scrollIndex, args)
+    local title = actionType == 'nearest' and 'Nearest Task' or (actionType == 'do_action' and 'Do Action' or 'On Point')
+    NtMenu.open(title, BuildActionMenu(actionType), function(selected, args)
         if args.action == 'start' then
-            exports.ox_lib:hideMenu()
+            NtMenu.hide(false)
             isMenuOpen = false
 
             local ped = PlayerPedId()
@@ -487,12 +491,10 @@ function OpenActionMenu(actionType)
                 TaskUseScenarioPoint(ped, args.pointId, args.scenarioName, 0.0, false, false, false, false)
             end
         elseif args.action == 'noop' then
-            exports.ox_lib:hideMenu()
+            NtMenu.hide(false)
             isMenuOpen = false
         end
     end)
-
-    exports.ox_lib:showMenu('scenario_action')
 end
 
 function OpenPoseMenu()
@@ -507,13 +509,7 @@ function OpenPoseMenu()
     end
     table.insert(options, { label = "Leave Scenario", args = { action = 'finish' } })
 
-    exports.ox_lib:registerMenu({
-        id = 'scenario_pose',
-        title = 'Change Pose',
-        position = 'top-right',
-        options = options,
-        canClose = true
-    }, function(selected, scrollIndex, args)
+    NtMenu.open('Change Pose', options, function(selected, args)
         if args.action == 'select_category' then
             CachedCategoryKey = args.categoryName
             OpenCategoryMenu()
@@ -527,7 +523,7 @@ function OpenPoseMenu()
             TaskStartScenarioAtPositionHash(ped, h, px, py, pz, hdg, 0, false, true)
             inTempScenario = false
         elseif args.action == 'unstuck' then
-            exports.ox_lib:hideMenu()
+            NtMenu.hide(false)
             isMenuOpen = false
             if CachedScenarioPointId and CachedPlayerOffset then
                 local ped = PlayerPedId()
@@ -540,7 +536,7 @@ function OpenPoseMenu()
                 ClearPedTasksImmediately(ped)
             end
         elseif args.action == 'finish' then
-            exports.ox_lib:hideMenu()
+            NtMenu.hide(false)
             isMenuOpen = false
             local ped = PlayerPedId()
             ForceExitScenario(ped)
@@ -551,8 +547,6 @@ function OpenPoseMenu()
             return
         end
     end)
-
-    exports.ox_lib:showMenu('scenario_pose')
 end
 
 function OpenCategoryMenu()
@@ -562,13 +556,7 @@ function OpenCategoryMenu()
         options = { { label = "No poses available", args = { action = 'noop' } } }
     end
 
-    exports.ox_lib:registerMenu({
-        id = 'scenario_category',
-        title = CachedCategoryKey,
-        position = 'top-right',
-        options = options,
-        canClose = true
-    }, function(selected, scrollIndex, args)
+    NtMenu.open(CachedCategoryKey, options, function(selected, args)
         if args.action == 'switch_pose' then
             local ped = PlayerPedId()
             local coords = GetEntityCoords(ped)
@@ -582,8 +570,6 @@ function OpenCategoryMenu()
             return
         end
     end)
-
-    exports.ox_lib:showMenu('scenario_category')
 end
 
 function OpenEmotesMenu()
@@ -594,18 +580,12 @@ function OpenEmotesMenu()
     end
     table.insert(options, { label = "Stop Emote", args = { action = 'stop_emote' } })
 
-    exports.ox_lib:registerMenu({
-        id = 'scenario_emotes',
-        title = 'Emotes',
-        position = 'top-right',
-        options = options,
-        canClose = true
-    }, function(selected, scrollIndex, args)
+    NtMenu.open('Emotes', options, function(selected, args)
         if args.action == 'select_emotes_category' then
             CachedCategoryKey = args.categoryName
             OpenEmoteCategoryMenu()
         elseif args.action == 'stop_emote' then
-            exports.ox_lib:hideMenu()
+            NtMenu.hide(false)
             isMenuOpen = false
             ExecuteCommand('e')
             menuList = nil
@@ -613,8 +593,6 @@ function OpenEmotesMenu()
             return
         end
     end)
-
-    exports.ox_lib:showMenu('scenario_emotes')
 end
 
 function OpenEmoteCategoryMenu()
@@ -624,15 +602,9 @@ function OpenEmoteCategoryMenu()
         options = { { label = "No emotes available", args = { action = 'noop' } } }
     end
 
-    exports.ox_lib:registerMenu({
-        id = 'scenario_emotes_category',
-        title = CachedCategoryKey,
-        position = 'top-right',
-        options = options,
-        canClose = true
-    }, function(selected, scrollIndex, args)
+    NtMenu.open(CachedCategoryKey, options, function(selected, args)
         if args.action == 'play_emote' then
-            exports.ox_lib:hideMenu()
+            NtMenu.hide(false)
             isMenuOpen = false
             ExecuteCommand('e ' .. args.emoteKey)
             menuList = nil
@@ -640,8 +612,6 @@ function OpenEmoteCategoryMenu()
             return
         end
     end)
-
-    exports.ox_lib:showMenu('scenario_emotes_category')
 end
 
 local function OpenMenuHandler()
@@ -660,7 +630,7 @@ Citizen.CreateThread(function()
         Citizen.Wait(4)
         if isOpenPressed() then
             if isMenuOpen then
-                exports.ox_lib:hideMenu()
+                NtMenu.hide(false)
                 isMenuOpen = false
             else
                 OpenMenuHandler()
@@ -681,7 +651,7 @@ end)
 
 AddEventHandler('onResourceStop', function(resourceName)
     if (GetCurrentResourceName() ~= resourceName) then return end
-    exports.ox_lib:hideMenu()
+    NtMenu.hide(false)
     isMenuOpen = false
     if IsPedActiveInScenario(PlayerPedId()) then
         SetPedShouldPlayNormalScenarioExit(PlayerPedId())

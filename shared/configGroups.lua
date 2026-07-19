@@ -1,7 +1,26 @@
 ConfigGroups = {}
 
+-- Display order for menus. Keep this list in the order you want groups shown.
+ConfigGroups.ScenarioOrder = {
+    "Sitting",
+    "Piano",
+    "Sit at Table",
+    "Camp Fire",
+    "PROP_CAMP_SEAT_CHAIR_STEW",
+    "PROP_CAMP_SEAT_CHAIR_TABLE_STEW",
+    "PROP_HUMAN_PUMP_WATER",
+    "PROP_HUMAN_GRINDSTONE",
+    "PROP_HUMAN_FOODPREP_STEW",
+    "PROP_HUMAN_CAULDRON_SERVE_STEW",
+    "PROP_HUMAN_WOOD_CHOP",
+    "PROP_HUMAN_SLEEP_BED_PILLOW",
+    "PROP_HUMAN_TANNING_RACK_FLESHING",
+    "PROP_HUMAN_REPAIR_WAGON_WHEEL_ON_LARGE",
+}
+
 ConfigGroups.Scenario = {
     ["Sitting"] = {
+        CategoryOrder = { "Sitting", "Instruments", "Drinking / Smoking", "Other Activities" },
         truncate = {
             "PROP_HUMAN_SEAT_",
             "PROP_HUMAN_SEAT_",
@@ -58,6 +77,7 @@ ConfigGroups.Scenario = {
     },
 
     ["Piano"] = {
+        CategoryOrder = { "Piano" },
         truncate = {
             "PROP_HUMAN_PIANO_",
             "PROP_HUMAN_",
@@ -73,6 +93,7 @@ ConfigGroups.Scenario = {
     },
 
     ["Sit at Table"] = {
+        CategoryOrder = { "Dining" },
         truncate = {
             "PROP_HUMAN_SEAT_CHAIR_TABLE_",
         },
@@ -87,6 +108,7 @@ ConfigGroups.Scenario = {
     },
 
     ["Camp Fire"] = {
+        CategoryOrder = { "Sitting", "Drinking", "Work" },
         truncate = {
             "PROP_CAMP_FIRE_SEATED_",
             "PROP_CAMP_FIRE_",
@@ -148,6 +170,7 @@ ConfigGroups.Scenario = {
 
 
     ["PROP_CAMP_SEAT_CHAIR_STEW"] = {
+        CategoryOrder = { "Eating", "Resting" },
         truncate = {
             "PROP_CAMP_SEAT_CHAIR_STEW_",
             "PROP_CAMP_SEAT_CHAIR_",
@@ -180,6 +203,7 @@ ConfigGroups.Scenario = {
     },
 
     ["PROP_CAMP_SEAT_CHAIR_TABLE_STEW"] = {
+        CategoryOrder = { "Eating", "Resting" },
         truncate = {
             "PROP_CAMP_SEAT_CHAIR_TABLE_STEW_",
             "PROP_CAMP_SEAT_CHAIR_TABLE_",
@@ -209,6 +233,7 @@ ConfigGroups.Scenario = {
     },
 
     ["PROP_HUMAN_PUMP_WATER"] = {
+        CategoryOrder = { "Pumping", "With Bucket" },
         truncate = {
             "PROP_HUMAN_PUMP_WATER_",
             "PROP_HUMAN_PUMP_",
@@ -228,6 +253,7 @@ ConfigGroups.Scenario = {
     },
 
     ["PROP_HUMAN_GRINDSTONE"] = {
+        CategoryOrder = { "Grinding" },
         truncate = {
             "PROP_HUMAN_GRINDSTONE_",
             "PROP_HUMAN_",
@@ -241,6 +267,7 @@ ConfigGroups.Scenario = {
     },
 
     ["PROP_HUMAN_FOODPREP_STEW"] = {
+        CategoryOrder = { "Base", "Preparing", "Resting", "Carrying" },
         truncate = {
             "PROP_HUMAN_FOODPREP_STEW_",
             "PROP_HUMAN_FOODPREP_",
@@ -287,6 +314,7 @@ ConfigGroups.Scenario = {
     },
 
     ["PROP_HUMAN_CAULDRON_SERVE_STEW"] = {
+        CategoryOrder = { "Serving", "Always", "No Pot" },
         truncate = {
             "PROP_HUMAN_CAULDRON_SERVE_STEW_",
             "PROP_HUMAN_CAULDRON_SERVE_",
@@ -312,6 +340,7 @@ ConfigGroups.Scenario = {
     },
 
     ["PROP_HUMAN_WOOD_CHOP"] = {
+        CategoryOrder = { "Chopping", "With Axe", "Logs", "Picking" },
         truncate = {
             "PROP_HUMAN_WOOD_CHOP_",
             "PROP_HUMAN_WOOD_",
@@ -367,6 +396,7 @@ ConfigGroups.Scenario = {
     },
 
     ["PROP_HUMAN_SLEEP_BED_PILLOW"] = {
+        CategoryOrder = { "Sleeping" },
         truncate = {
             "PROP_HUMAN_SLEEP_",
         },
@@ -381,6 +411,7 @@ ConfigGroups.Scenario = {
     },
 
     ["PROP_HUMAN_TANNING_RACK_FLESHING"] = {
+        CategoryOrder = { "Working" },
         truncate = {
             "PROP_HUMAN_",
         },
@@ -394,6 +425,7 @@ ConfigGroups.Scenario = {
     },
 
     ["PROP_HUMAN_REPAIR_WAGON_WHEEL_ON_LARGE"] = {
+        CategoryOrder = { "Large Wheel", "Small Wheel" },
         truncate = {
             "PROP_HUMAN_",
         },
