@@ -23,7 +23,7 @@ Some scenarios in the config do not work, working on filtering the config more.
 
 - **Object Target**: Select an object with ox_target, choose a scenario group and pose, then fine tune the player position with on-screen arrows. Confirming with the save checkbox enabled stores the object-model/group offset in `object_offsets.json` for future use.
 
-- **Custom NUI**: All action, scenario, pose, emote, and object-target navigation uses the same right-side menu and `html/assets/background.png` artwork.
+- **Custom NUI**: All action, scenario, pose, emote, and object-target navigation uses the same right-side Old West menu, with persistent viewport-aware scaling.
 
 ## Dependencies
 

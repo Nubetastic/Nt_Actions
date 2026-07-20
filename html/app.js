@@ -13,8 +13,15 @@ const navScaleControl = document.getElementById('nav-scale-control');
 const navScale = document.getElementById('nav-scale');
 const navScaleValue = document.getElementById('nav-scale-value');
 const navBack = document.getElementById('nav-back');
+const navPanel = navigation.querySelector('.nav-panel');
+const scaleStorageKey = 'nt_actions_ui_scale';
+const defaultUiScale = 1;
+const absoluteScaleMin = 0.5;
+const absoluteScaleMax = 2;
+const scaleStep = 0.05;
 let selectedNavIndex = 0;
 let rotationMultiplier = 200;
+let selectedUiScale = defaultUiScale;
 
 const updateStepLabel = () => {
     const movement = Number(movementStep.value);
@@ -27,16 +34,45 @@ const send = (name, data = {}) => fetch(`https://${GetParentResourceName()}/${na
     body: JSON.stringify(data),
 });
 
+const roundScaleDown = (value) => Math.floor((value + Number.EPSILON) / scaleStep) * scaleStep;
+
+const getStoredScale = () => {
+    const storedScale = Number(localStorage.getItem(scaleStorageKey));
+    return Number.isFinite(storedScale) && storedScale > 0 ? storedScale : null;
+};
+
+const applyNavScale = (requestedScale, persist = true) => {
+    const maximum = Number(navScale.max) || absoluteScaleMax;
+    selectedUiScale = Math.max(absoluteScaleMin, Math.min(maximum, Number(requestedScale) || defaultUiScale));
+    selectedUiScale = Math.round(selectedUiScale / scaleStep) * scaleStep;
+    document.documentElement.style.setProperty('--nav-scale', selectedUiScale);
+    navScale.value = selectedUiScale;
+    navScaleValue.textContent = `${Math.round(selectedUiScale * 100)}%`;
+    if (persist) localStorage.setItem(scaleStorageKey, selectedUiScale.toFixed(2));
+};
+
+const updateViewportScaleMaximum = (persist = true) => {
+    if (!navigation.classList.contains('visible')) return;
+    const widthScale = (window.innerWidth * 0.94) / navPanel.offsetWidth;
+    const heightScale = (window.innerHeight * 0.94) / navPanel.offsetHeight;
+    const viewportMax = Math.min(absoluteScaleMax, widthScale, heightScale);
+    const maxScale = Math.max(absoluteScaleMin, roundScaleDown(viewportMax));
+    navScale.max = maxScale.toFixed(2);
+    const previousScale = selectedUiScale;
+    applyNavScale(selectedUiScale, persist);
+    if (selectedUiScale !== previousScale) send('navScale', { scale: selectedUiScale });
+};
+
 window.addEventListener('message', ({ data }) => {
     if (data.action === 'navOpen') {
         navTitle.textContent = data.title || 'Menu';
-        const scale = Number(data.scale) || 1;
-        document.documentElement.style.setProperty('--nav-scale', scale);
-        navScale.min = data.scaleMin !== undefined ? data.scaleMin : 0.75;
-        navScale.max = data.scaleMax !== undefined ? data.scaleMax : 1.25;
-        navScale.step = data.scaleStep !== undefined ? data.scaleStep : 0.05;
-        navScale.value = scale;
-        navScaleValue.textContent = `${scale.toFixed(2)}x`;
+        const configuredMin = Number(data.scaleMin);
+        const configuredMax = Number(data.scaleMax);
+        navScale.min = Number.isFinite(configuredMin) ? Math.max(absoluteScaleMin, configuredMin) : absoluteScaleMin;
+        navScale.max = Number.isFinite(configuredMax) ? Math.min(absoluteScaleMax, configuredMax) : absoluteScaleMax;
+        navScale.step = scaleStep;
+        const storedScale = getStoredScale();
+        selectedUiScale = storedScale !== null ? storedScale : (Number(data.scale) || defaultUiScale);
         navScaleControl.classList.toggle('visible', data.showScale === true);
         navOptions.innerHTML = '';
         (data.options || []).forEach((option, index) => {
@@ -62,6 +98,8 @@ window.addEventListener('message', ({ data }) => {
         selectedNavIndex = 0;
         navigation.classList.add('visible');
         navigation.setAttribute('aria-hidden', 'false');
+        applyNavScale(selectedUiScale);
+        requestAnimationFrame(() => updateViewportScaleMaximum());
         selectNavOption(0);
     }
     if (data.action === 'navClose') {
@@ -112,11 +150,11 @@ navBack.addEventListener('click', () => send('navBack'));
 document.getElementById('nav-close').addEventListener('click', () => send('navClose'));
 
 navScale.addEventListener('input', () => {
-    const scale = Number(navScale.value);
-    document.documentElement.style.setProperty('--nav-scale', scale);
-    navScaleValue.textContent = `${scale.toFixed(2)}x`;
-    send('navScale', { scale });
+    applyNavScale(Number(navScale.value));
+    send('navScale', { scale: selectedUiScale });
 });
+
+window.addEventListener('resize', () => updateViewportScaleMaximum());
 
 document.querySelectorAll('[data-direction]').forEach((button) => {
     button.addEventListener('click', async () => {

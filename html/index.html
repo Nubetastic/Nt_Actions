@@ -10,20 +10,18 @@
     <aside id="navigation" aria-hidden="true">
         <div class="nav-panel menu-surface">
             <header class="nav-header">
-                <div class="nav-ornament">&#10022;</div>
                 <h1 id="nav-title">Menu</h1>
-                <div class="nav-ornament">&#10022;</div>
+                <button id="nav-close" class="panel-close" type="button">Close</button>
             </header>
+            <label id="nav-scale-control" class="nav-scale-control" for="nav-scale">
+                <span>Scale</span>
+                <input id="nav-scale" class="slider" type="range" min="0.50" max="2.00" step="0.05" value="1.00" aria-label="Scale interface">
+                <output id="nav-scale-value" for="nav-scale">100%</output>
+            </label>
             <div id="nav-options" class="nav-options"></div>
-            <div id="nav-scale-control" class="nav-scale-control">
-                <label for="nav-scale">Menu scale</label>
-                <input id="nav-scale" class="slider" type="range" min="0.75" max="1.25" step="0.05" value="1">
-                <output id="nav-scale-value">1.00x</output>
-            </div>
             <div id="nav-description" class="nav-description" aria-live="polite"></div>
             <footer class="nav-footer">
                 <button id="nav-back" type="button">Back</button>
-                <button id="nav-close" type="button">Close</button>
             </footer>
             <div class="nav-help">Arrow keys to navigate &bull; Enter to select</div>
         </div>

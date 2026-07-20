@@ -4,8 +4,8 @@ local currentMenu
 local menuStack = {}
 local menuScaleKvp = 'nt_actions:menu_scale'
 local scaleConfig = Config.MenuScale or {}
-local scaleMin = tonumber(scaleConfig.Min) or 0.75
-local scaleMax = tonumber(scaleConfig.Max) or 1.25
+local scaleMin = tonumber(scaleConfig.Min) or 0.5
+local scaleMax = tonumber(scaleConfig.Max) or 2.0
 local scaleStep = tonumber(scaleConfig.Step) or 0.05
 local defaultScale = tonumber(scaleConfig.Default) or 1.0
 local menuScale = GetResourceKvpFloat(menuScaleKvp)
@@ -37,7 +37,7 @@ local function sendMenu()
         title = currentMenu.title or 'Menu',
         options = options,
         canGoBack = #menuStack > 0,
-        showScale = currentMenu.showScale == true,
+        showScale = true,
         scale = menuScale,
         scaleMin = scaleMin,
         scaleMax = scaleMax,
@@ -46,14 +46,13 @@ local function sendMenu()
     TriggerEvent('nt_actions:client:setMenuOpen', true)
 end
 
-function NtMenu.open(title, options, callback, onClose, settings)
+function NtMenu.open(title, options, callback, onClose, _settings)
     if currentMenu then menuStack[#menuStack + 1] = currentMenu end
     currentMenu = {
         title = title,
         options = options or {},
         callback = callback,
         onClose = onClose,
-        showScale = settings and settings.showScale == true,
     }
     sendMenu()
 end
