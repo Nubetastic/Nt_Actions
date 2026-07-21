@@ -1,5 +1,7 @@
 Config = {}
 
+Config.Debug = true
+
 Config.StartKey = 0x80F28E95 -- L
 
 Config.EmotesEvent = "rsg-animations:server:Open" -- If blank Emote Button is hidden.
@@ -12,30 +14,10 @@ Config.MenuScale = {
     Step = 0.05,
 }
 
--- Main menu buttons are displayed in this order.
+-- The L-key utility menu is intentionally separate from object poses.
 Config.MainMenuButtons = {
     {
-        label = "Nearest Task",
-        description = "Player does the closest available task that exists in the world.",
-        action = "nearest",
-    },
-    {
-        label = "On Point",
-        description = "Choose a nearby world scenario and use its existing scenario point.",
-        action = "on_point",
-    },
-    {
-        label = "Do Action",
-        description = "Choose a nearby world scenario and perform it at the scenario point position.",
-        action = "do_action",
-    },
-    {
-        label = "Object Target",
-        description = "Target an object, choose a scenario, and fine tune the position.",
-        action = "object_target",
-    },
-    {
-        label = "GunTwirl",
+        label = "Gun Twirl",
         description = "Open the gun twirl controls.",
         action = "guntwirl",
     },

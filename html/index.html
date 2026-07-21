@@ -22,13 +22,14 @@
             <div id="nav-description" class="nav-description" aria-live="polite"></div>
             <footer class="nav-footer">
                 <button id="nav-back" type="button">Back</button>
+                <div id="nav-footer-actions" class="nav-footer-actions"></div>
             </footer>
             <div class="nav-help">Arrow keys to navigate &bull; Enter to select</div>
         </div>
     </aside>
     <main id="fine-tune" aria-hidden="true">
         <div class="panel menu-surface">
-            <div class="title">Fine tune position</div>
+            <div id="editor-title" class="title">Fine tune position</div>
             <div class="control-row">
                 <section class="control-group">
                     <div class="control-label">Position</div>
@@ -65,7 +66,9 @@
                 <output id="camera-zoom-value">3.00 m</output>
             </div>
             <div class="camera-hint">Hold right mouse button to orbit the camera around the player</div>
-            <label class="save"><input id="save-offset" type="checkbox" checked> Save for this object and group</label>
+            <div class="editor-options">
+                <label id="point-coords-option" class="save unavailable"><input id="point-coords" type="checkbox" disabled> Get Point Coords</label>
+            </div>
             <div class="actions">
                 <button id="cancel" class="secondary">Cancel</button>
                 <button id="confirm" class="confirm">&#10003; Confirm</button>

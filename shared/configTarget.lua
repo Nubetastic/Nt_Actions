@@ -1,15 +1,60 @@
 ConfigTarget = {
-    -- Temporary ox_target option shown after choosing "Object Target".
-    TargetLabel = 'Use object for scenario',
-    TargetIcon = 'fa-solid fa-crosshairs',
+    -- Permanent ox_target entry used to open an object's shared pose library.
+    TargetLabel = 'Object poses',
+    TargetIcon = 'fa-solid fa-person',
     TargetDistance = 2.5,
+
+    -- Players build and modify pose libraries. Deletion remains administrative.
+    AllowPlayerBuild = true,
+    AllowPlayerModify = true,
+
+    -- DeletePermissionMode accepts 'job' or 'server'.
+    -- job: an on-duty player whose job is listed in AdminJobs may manage poses.
+    -- server: ACE or an RSG admin/god permission may delete pose groups.
+    DeletePermissionMode = 'job',
+    AdminJobs = {
+        "admin",
+        "actionsMod",
+    },
+    ServerAdminAce = 'nt_actions.admin',
+    ServerAdminPermissions = { 'admin', 'god' },
 
     -- Object-local starting position. X is left/right, Y is forward/backward.
     DefaultOffset = { x = 0.0, y = 0.0, z = 0.5, heading = 180.0 },
-    FineTuneStep = 0.025,
+
+    -- Object pose-list and footer text.
+    MenuText = {
+        ObjectTitle = 'Object Poses',
+        AddPose = 'Add Pose',
+        AddGroupTitle = 'Add Pose Group',
+        Modify = 'Modify',
+        Leave = 'Leave Pose',
+        Exit = 'Exit',
+        Undo = 'Undo',
+        UndoTitle = 'Hidden Poses',
+        NoHiddenPoses = 'No hidden poses',
+        Empty = 'No poses added to this object',
+        AllGroupsAdded = 'All poses are already added',
+        AllGroupPosesAdded = 'All poses in this group are already added',
+    },
+
+    -- Defaults used whenever the Add/Modify Pose editor opens.
+    PoseEditor = {
+        AddTitle = 'Add pose',
+        ModifyTitle = 'Modify pose',
+        DefaultStep = 0.025,
+        DefaultCameraZoom = 2.5,
+    },
+
     FineTuneStepMin = 0.005,
     FineTuneStepMax = 0.25,
     FineTuneSliderStep = 0.005,
+    AddPoseMenuDelay = 5000, -- Prevent L from reopening the pose list during the editor transition.
+    PropCleanupDelay = 250, -- Second attached-prop cleanup after the scenario task ends.
+    ExitCollisionRadius = 0.3,
+    ExitSafeCoordTolerance = 0.75,
+    PointSearchDistance = 0.5,
+    PointSearchDelay = 3000, -- Wait for the pose to settle before checking player coords.
     -- Converts the movement slider value to degrees (0.025 x 200 = 5 degrees).
     RotationStepMultiplier = 200.0,
     CameraControl = 0xF84FA74F, -- Right mouse button in RedM
@@ -27,6 +72,6 @@ ConfigTarget = {
     CameraTransition = 250,
     MaxOffset = 6.0,
 
-    -- Saved inside this resource by server/target.lua.
+    -- Shared object pose libraries are saved inside this resource.
     CacheFile = 'object_offsets.json',
 }

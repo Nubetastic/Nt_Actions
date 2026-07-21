@@ -1,20 +1,48 @@
-{
-    "-2062900430": {
-        "Sitting": {
-            "y": 0.05,
-            "z": 0.5,
-            "group": "Sitting",
-            "heading": 180.0,
-            "model": -2062900430,
-            "x": 0.615
-        },
-        "PROP_HUMAN_SLEEP_BED_PILLOW": {
-            "y": -0.04499999999999,
-            "z": 0.5,
-            "group": "PROP_HUMAN_SLEEP_BED_PILLOW",
-            "x": 0.0,
-            "model": -2062900430,
-            "heading": 93.0
+[
+  {
+    "item": -847228074,
+    "offsets": [
+      { "x": 0.0, "y": -0.35, "z": 0.5, "heading": 180.0 }
+    ],
+    "poses": {
+      "show": {
+        "Sleep Bed Pillow": {
+          "PROP_HUMAN_SLEEP_BED_PILLOW": 1,
+          "PROP_HUMAN_SLEEP_BED_PILLOW_RIGHT": 1
         }
+      },
+      "noshow": {}
     }
-}
+  },
+  {
+    "item": -382289692,
+    "offsets": [
+      { "x": 0.0, "y": 0.0, "z": 0.25, "heading": 340.0 }
+    ],
+    "poses": {
+      "show": {
+        "Seat Bench": {
+          "PROP_HUMAN_SEAT_BENCH": 1
+        }
+      },
+      "noshow": {}
+    }
+  },
+  {
+    "item": 325252933,
+    "offsets": [
+      { "x": 0.025, "y": 0.05, "z": 0.5, "heading": 179.99996948242188 }
+    ],
+    "poses": {
+      "show": {
+        "Sit at Table": {
+          "PROP_HUMAN_PASSED_OUT_TABLE": 1,
+          "PROP_HUMAN_SEAT_CHAIR_TABLE_DRINKING": 1,
+          "PROP_HUMAN_SEAT_CHAIR_TABLE_DRINKING_MOONSHINE": 1,
+          "PROP_HUMAN_SEAT_CHAIR_TABLE_DRINKING_WHISKEY_MOONSHINE": 1
+        }
+      },
+      "noshow": {}
+    }
+  }
+]

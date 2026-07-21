@@ -28,6 +28,15 @@ local function sendMenu()
             label = option.label or ('Option ' .. index),
             description = option.description,
             disabled = option.disabled == true or not option.args,
+            deletable = option.deletable == true,
+            restorable = option.restorable == true,
+        }
+    end
+    local footerActions = {}
+    for index, action in ipairs(currentMenu.footerActions or {}) do
+        footerActions[index] = {
+            label = action.label or ('Action ' .. index),
+            disabled = action.disabled == true or not action.args,
         }
     end
 
@@ -36,6 +45,7 @@ local function sendMenu()
         action = 'navOpen',
         title = currentMenu.title or 'Menu',
         options = options,
+        footerActions = footerActions,
         canGoBack = #menuStack > 0,
         showScale = true,
         scale = menuScale,
@@ -46,13 +56,18 @@ local function sendMenu()
     TriggerEvent('nt_actions:client:setMenuOpen', true)
 end
 
-function NtMenu.open(title, options, callback, onClose, _settings)
+function NtMenu.open(title, options, callback, onClose, settings)
+    settings = settings or {}
     if currentMenu then menuStack[#menuStack + 1] = currentMenu end
     currentMenu = {
         title = title,
         options = options or {},
         callback = callback,
         onClose = onClose,
+        onDelete = settings.onDelete,
+        onRestore = settings.onRestore,
+        footerActions = settings.footerActions or {},
+        onFooter = settings.onFooter,
     }
     sendMenu()
 end
@@ -71,6 +86,10 @@ function NtMenu.isOpen()
     return currentMenu ~= nil
 end
 
+function NtMenu.getScale()
+    return menuScale
+end
+
 RegisterNUICallback('navSelect', function(data, cb)
     local menu = currentMenu
     local index = tonumber(data.index)
@@ -82,6 +101,45 @@ RegisterNUICallback('navSelect', function(data, cb)
 
     cb({ ok = true })
     if menu.callback then menu.callback(index, option.args) end
+end)
+
+RegisterNUICallback('navDelete', function(data, cb)
+    local menu = currentMenu
+    local index = tonumber(data.index)
+    local option = menu and index and menu.options[index]
+    if not option or option.deletable ~= true or not option.args or not menu.onDelete then
+        cb({ ok = false })
+        return
+    end
+
+    cb({ ok = true })
+    menu.onDelete(index, option.args)
+end)
+
+RegisterNUICallback('navRestore', function(data, cb)
+    local menu = currentMenu
+    local index = tonumber(data.index)
+    local option = menu and index and menu.options[index]
+    if not option or option.restorable ~= true or not option.args or not menu.onRestore then
+        cb({ ok = false })
+        return
+    end
+
+    cb({ ok = true })
+    menu.onRestore(index, option.args)
+end)
+
+RegisterNUICallback('navFooter', function(data, cb)
+    local menu = currentMenu
+    local index = tonumber(data.index)
+    local action = menu and index and menu.footerActions[index]
+    if not action or action.disabled or not action.args or not menu.onFooter then
+        cb({ ok = false })
+        return
+    end
+
+    cb({ ok = true })
+    menu.onFooter(index, action.args)
 end)
 
 RegisterNUICallback('navBack', function(_, cb)

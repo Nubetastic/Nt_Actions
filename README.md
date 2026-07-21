@@ -1,67 +1,146 @@
 # Nt_Actions
 
-A RedM resource providing a unified action menu.
-Some scenarios in the config do not work, working on filtering the config more.
+A RedM object-pose library with a separate utility menu for gun tricks and external animations.
 
-## Features
+## Interfaces
 
-- **Unified Scenario Menu**: Press **L** to open a context menu for nearby scenarios and group actions
-  - While Idle, displays nearby scenarios in the world.
-  - When in a scenario, it displays groups of other scenarios that are compatible with the current one.
-  - Three different methods to using a scenario from idle.
-    - Change pose performs them at coords.
-    - On point anchors the player to the item, it uses scenario point.
-- Leave and Unstuck
-  - Leave ends the scenario normally, unstuck teleports you back to your original coords.
+### L-key utility menu
 
-- **Gun Twirl Tricks**: Press **Page Down** to trigger and manage gun trick emotes
-  - Multiple twirl animations (standard, dual, and variants A-B-D)
-  - Navigate tricks with arrow keys (Up/Down)
-  - Perform tricks with Right arrow, cancel with Left arrow
+Press **L** to open the small utility menu when not using an object pose. It contains:
 
-- **rsg-animations button**: Added a menu button for rsg-animations for easy unified access.
+- **Gun Twirl**
+- The configured external animation menu, such as **rsg-animations**
 
-- **Object Target**: Select an object with ox_target, choose a scenario group and pose, then fine tune the player position with on-screen arrows. Confirming with the save checkbox enabled stores the object-model/group offset in `object_offsets.json` for future use.
+Scenario and object-pose controls are intentionally not shown in this menu.
+While `inPose` is true, pressing **L** skips the utility menu and opens the cached object's pose list directly.
 
-- **Custom NUI**: All action, scenario, pose, emote, and object-target navigation uses the same right-side Old West menu, with persistent viewport-aware scaling.
+### Object pose menu
+
+Target any object with **ox_target** and select **Object poses**. The menu lists every pose that players have published for that object model.
+
+- Selecting a pose starts it at the saved object-relative position and heading.
+- **Add Pose** selects a configured group, then one pose from that group, and opens the existing offset editor. Saving publishes only that pose.
+- When adding from an active pose on the same object, the new pose starts from the active pose's offset.
+- Starting Add Pose blocks the L menu for `AddPoseMenuDelay` (`5000` ms by default), preventing the pose list and offset editor from opening together.
+- **Exit** closes the menu when the player is not using an object pose.
+- While using a pose, the bottom actions become **Add Pose**, **Modify**, and **Leave Pose**.
+- **Modify** reopens the offset editor for the active pose.
+- **Leave Pose** exits the active scenario.
+- Entering a pose from a non-pose position caches that starting transform. Leave Pose teleports the player to that cached position, immediately clears all pose tasks, sets the stamina core to `100`, and resurrects at the cached coordinates and heading while preserving health.
+- Targeting a different object while posed still provides **Leave Pose** for the currently active pose.
+
+The client globals `inPose` and `cachedPoseObject` track the active state and object. Selecting or saving an object pose sets them; leaving the pose or losing the scenario clears them.
+
+Offsets and published poses are shared by object model and stored in `object_offsets.json`. Adding a pose to one chair model makes that pose available on all objects with the same model.
+
+## Pose groups
+
+Pose groups are configured as `group > list of poses` in `shared/configGroups.lua`. The included groups are:
+
+- Ground
+- Seat Chair
+- Seat Bench
+- Sit at Table
+- Piano
+- Camp Fire
+- Sleep Bed Pillow
+
+Groups organize the full configured pose list in the menus, but poses are added and positioned individually. The client builds every configured pose with `show = false`, then marks an object's saved poses with their stored `show` value. Only poses with `show = true` appear in the main object menu.
+
+Each object model has one JSON entry. Its offsets are numbered once, and each pose stores only the number of its offset. Poses are divided into `show` and `noshow`, then by configured group:
+
+```json
+{
+  "item": 123456,
+  "offsets": [
+    { "x": 0.0, "y": 0.0, "z": 0.5, "heading": 180.0 }
+  ],
+  "poses": {
+    "show": {
+      "Seat Chair": {
+        "PROP_HUMAN_SEAT_CHAIR": 1
+      }
+    },
+    "noshow": {}
+  }
+}
+```
+
+Unused offsets are removed and the pose numbers are compacted whenever the file is saved.
+
+## Deletion permissions
+
+Authorized users see a minus button beside each published pose. Clicking it moves only that pose from `poses.show` to `poses.noshow`; its group and other poses remain available.
+
+Admins receive an **Undo** tab at the bottom of the object pose menu whenever hidden poses exist. Undo opens the hidden-pose list, where a green plus restores one pose at a time. Hidden poses remain stored and are excluded from Add, so restoration is only accepted through the server-authorized Undo callback.
+
+Configure `DeletePermissionMode` in `shared/configTarget.lua`:
+
+- `job`: the player must be on duty and have a job listed in `AdminJobs`.
+- `server`: the player must have the configured ACE permission or one of the configured RSG permissions (`admin` or `god` by default).
+
+Example job configuration:
+
+```lua
+DeletePermissionMode = 'job',
+AdminJobs = {
+    "sheriff",
+    "police",
+},
+```
+
+Example ACE configuration:
+
+```cfg
+add_ace group.admin nt_actions.admin allow
+```
+
+Then use:
+
+```lua
+DeletePermissionMode = 'server'
+```
+
+All add, modify, and hide requests are validated by the server. Player building and modification can be disabled with `AllowPlayerBuild` and `AllowPlayerModify`.
+
+## Offset editor
+
+The existing Old West interface, colors, camera orbit, movement, height, rotation, and zoom controls are retained. The editor now uses the same width and saved scale as the main menu without displaying another scale bar.
+
+**Get Point Coords** starts the selected pose, waits for `PointSearchDelay` (`3000` ms by default), and then searches around the character's updated coordinates using `PointSearchDistance` (`0.5` by default). When a scenario point is found, checking it copies that point's coordinates and heading into the object-relative offset. When no point exists, the option remains unchecked, disabled, and grey. Cancel restores the previous active pose or the player's position before editing.
 
 ## Dependencies
 
-- **[ox_lib](https://github.com/overextended/ox_lib)** - UI library for creating interactive menus (required)
-- **[ox_target](https://github.com/overextended/ox_target)** - One-use object selection for positioned scenarios (required)
-- **[rsg-animations](https://github.com/Rexshack-RedM/rsg-animations)** - can be changed in config to another frameworks.
+- [ox_lib](https://github.com/overextended/ox_lib)
+- [ox_target](https://github.com/overextended/ox_target)
+- [rsg-animations](https://github.com/Rexshack-RedM/rsg-animations) is optional and can be replaced through `Config.EmotesEvent`.
+- `rsg-core` is used when job or RSG server permissions are selected.
 
 ## Installation
 
-1. Place the `Nt_Actions` folder in your RedM server's `resources` directory
-2. Ensure `ox_lib` is installed and started before this resource
-3. Add to your server config:
-   ```lua
-   ensure ox_lib
-   ensure ox_target
-   ensure Nt_Actions
-   ```
+```cfg
+ensure ox_lib
+ensure ox_target
+ensure Nt_Actions
+```
 
-## Usage
+Object targeting labels, distance, default offsets, editor steps, permission mode, and administrative access are configured in `shared/configTarget.lua`.
 
-### Scenario Menu
-- Press **L** while in-game to open the scenario menu
-- Select a scenario from the nearby list or your current group
-- Select **Object Target**, target an object once, then choose a group and scenario
-- Use the position arrows, height controls, shared movement/rotation step slider, and rotation buttons to align the scenario; confirm to keep playing and optionally save that offset
-- Fine tuning preserves the current gameplay-camera pitch and places the scripted camera behind the player using the selected scenario heading; hold right mouse to orbit it
-- The positioning camera starts at a distance equal to `MaxOffset`; use the camera zoom slider to change its orbit distance
-- Fine-tune controls immediately reapply the scenario at its updated position and heading
+When `Config.Debug = true` in `shared/config.lua`, Leave Pose prints focused diagnostics with the `[Nt_Actions][LeavePose]` prefix. These include the original and posed Z values, the detected exit condition, timeout or collision fallbacks, and the final resurrection coordinates.
 
-Object targeting labels, distance, movement step, maximum offset, and default X/Y/Z/heading offsets can be changed in `shared/configTarget.lua`.
+The `MenuText` section controls the object menu title, Add/Modify/Leave/Exit labels, and empty-list messages. The `PoseEditor` section controls the Add/Modify editor:
 
-### Gun Tricks
-- Press **Page Down** to start the gun trick interface
-- Use **Up/Down arrows** to navigate between different tricks
-- Press **Right arrow** to perform the selected trick
-- Press **Left arrow** to cancel/end the current trick
+```lua
+PoseEditor = {
+    AddTitle = 'Add pose',
+    ModifyTitle = 'Modify pose',
+    DefaultStep = 0.025,
+    DefaultCameraZoom = 3.0,
+},
+```
+
+`DefaultStep` is clamped by `FineTuneStepMin` and `FineTuneStepMax`. `DefaultCameraZoom` is clamped by `CameraZoomMin` and `CameraZoomMax`.
 
 ## Credits
-Adapted the scenario script below and added some features, copied over the guntrwirl code.
-ricx_Scencarios - https://github.com/zelbeus/ricx_scenarios
-ricx_guntwirl - https://github.com/zelbeus/ricx_guntwirl
+
+Adapted from `ricx_scenarios` and `ricx_guntwirl` by zelbeus.
