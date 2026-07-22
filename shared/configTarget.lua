@@ -4,20 +4,16 @@ ConfigTarget = {
     TargetIcon = 'fa-solid fa-person',
     TargetDistance = 2.5,
 
-    -- Players build and modify pose libraries. Deletion remains administrative.
-    AllowPlayerBuild = true,
-    AllowPlayerModify = true,
-
-    -- DeletePermissionMode accepts 'job' or 'server'.
-    -- job: an on-duty player whose job is listed in AdminJobs may manage poses.
-    -- server: ACE or an RSG admin/god permission may delete pose groups.
-    DeletePermissionMode = 'job',
+    -- Jobs listed here may toggle Mod and manage hidden poses/unused coords, on or off duty.
     AdminJobs = {
         "admin",
         "actionsMod",
     },
-    ServerAdminAce = 'nt_actions.admin',
-    ServerAdminPermissions = { 'admin', 'god' },
+
+    -- Jobs allowed to use Batch Upload Review, separate from AdminJobs.
+    ReviewJobs = {
+        "admin",
+    },
 
     -- Object-local starting position. X is left/right, Y is forward/backward.
     DefaultOffset = { x = 0.0, y = 0.0, z = 0.5, heading = 180.0 },
@@ -41,7 +37,7 @@ ConfigTarget = {
     -- Defaults used whenever the Add/Modify Pose editor opens.
     PoseEditor = {
         AddTitle = 'Add pose',
-        ModifyTitle = 'Modify pose',
+        ModifyTitle = 'Modify point',
         DefaultStep = 0.025,
         DefaultCameraZoom = 2.5,
     },
@@ -55,6 +51,9 @@ ConfigTarget = {
     ExitSafeCoordTolerance = 0.75,
     PointSearchDistance = 0.5,
     PointSearchDelay = 3000, -- Wait for the pose to settle before checking player coords.
+    PointScanInterval = 350, -- Rescan after the editor moves the player.
+    PointScanMoveThreshold = 0.1,
+    PointScanLimit = 16,
     -- Converts the movement slider value to degrees (0.025 x 200 = 5 degrees).
     RotationStepMultiplier = 200.0,
     CameraControl = 0xF84FA74F, -- Right mouse button in RedM
@@ -74,4 +73,15 @@ ConfigTarget = {
 
     -- Shared object pose libraries are saved inside this resource.
     CacheFile = 'object_offsets.json',
+
+    BatchReview = {
+        File = 'object_offsets review.json',
+        SpawnDistance = 2.5,
+        ModelLoadTimeout = 10000,
+        SessionTimeout = 1800000,
+        CameraDistance = 3.0,
+        CameraZoomMin = 0.75,
+        CameraZoomMax = 8.0,
+        CameraZoomStep = 0.25,
+    },
 }

@@ -9,46 +9,25 @@ local function openPressed()
     return true
 end
 
-local function utilityOptions()
-    local options = {}
-    for _, button in ipairs(Config.MainMenuButtons or {}) do
-        local hasAnimationEvent = type(Config.EmotesEvent) == 'string' and Config.EmotesEvent:match('%S') ~= nil
-        if button.action ~= 'event_anim' or hasAnimationEvent then
-            options[#options + 1] = {
-                label = button.label,
-                description = button.description,
-                args = { action = button.action },
-            }
-        end
+local function handleOpenPress()
+    if inPose ~= true then return end
+    if not cachedPoseObject or not DoesEntityExist(cachedPoseObject) then
+        inPose = false
+        cachedPoseObject = nil
+        return
     end
-    return options
-end
-
-local function openUtilityMenu()
-    NtMenu.open('Actions', utilityOptions(), function(_, args)
-        NtMenu.hide(false)
-        if args.action == 'guntwirl' then
-            TriggerEvent('ricx_guntwirl:toggleTwirl')
-        elseif args.action == 'event_anim' then
-            TriggerServerEvent(Config.EmotesEvent)
-        end
-    end)
+    if GetGameTimer() < poseMenuBlockedUntil then return end
+    if NtMenu.isOpen() then
+        NtMenu.hide(true)
+        return
+    end
+    TriggerEvent('nt_actions:client:openCachedPoseList')
 end
 
 CreateThread(function()
     while true do
         Wait(4)
-        if openPressed() then
-            if GetGameTimer() < poseMenuBlockedUntil then
-                -- Add Pose is transitioning from the pose list into the offset editor.
-            elseif NtMenu.isOpen() then
-                NtMenu.hide(false)
-            elseif inPose and cachedPoseObject and DoesEntityExist(cachedPoseObject) then
-                TriggerEvent('nt_actions:client:openCachedPoseList')
-            else
-                openUtilityMenu()
-            end
-        end
+        if openPressed() then handleOpenPress() end
     end
 end)
 

@@ -1,0 +1,36 @@
+[
+  {
+    "item": 1057555344,
+    "offsets": [
+      { "x": -0.48548419347929, "y": -0.01733962201217, "z": 0.5, "heading": 183.0000295639038 },
+      { "x": 0.59756018841339, "y": 0.03064250706442, "z": 0.5, "heading": 179.99999904632569 },
+      { "x": 0.025, "y": -0.135, "z": 0.5, "heading": 270.0 }
+    ],
+    "poses": {
+      "show": {
+        "Seat Bench": [
+          ["PROP_HUMAN_SEAT_BENCH_FIDDLE"]
+        ]
+      },
+      "noshow": {}
+    }
+  },
+  {
+    "item": 1229219138,
+    "offsets": [
+      { "x": 0.45858014446913, "y": 0.04788749017986, "z": 0.50067138671875, "heading": 180.00000190734864 },
+      { "x": -0.4239563352384, "y": 0.04791048855256, "z": 0.4991226196289, "heading": 180.00000190734864 }
+    ],
+    "poses": {
+      "show": {
+        "Seat Bench": [
+          ["PROP_HUMAN_SEAT_BENCH_FIDDLE_UPBEAT"],
+          ["PROP_HUMAN_SEAT_BENCH_MANDOLIN"],
+          ["PROP_HUMAN_SEAT_BENCH_MANDOLIN_DOWNBEAT"],
+          ["PROP_HUMAN_SEAT_BENCH_MANDOLIN_UPBEAT"]
+        ]
+      },
+      "noshow": {}
+    }
+  }
+]

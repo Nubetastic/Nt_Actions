@@ -6,10 +6,10 @@
     ],
     "poses": {
       "show": {
-        "Sleep Bed Pillow": {
-          "PROP_HUMAN_SLEEP_BED_PILLOW": 1,
-          "PROP_HUMAN_SLEEP_BED_PILLOW_RIGHT": 1
-        }
+        "Sleep Bed Pillow": [
+          ["PROP_HUMAN_SLEEP_BED_PILLOW"],
+          ["PROP_HUMAN_SLEEP_BED_PILLOW_RIGHT"]
+        ]
       },
       "noshow": {}
     }
@@ -21,9 +21,9 @@
     ],
     "poses": {
       "show": {
-        "Seat Bench": {
-          "PROP_HUMAN_SEAT_BENCH": 1
-        }
+        "Seat Bench": [
+          ["PROP_HUMAN_SEAT_BENCH"]
+        ]
       },
       "noshow": {}
     }
@@ -31,16 +31,90 @@
   {
     "item": 325252933,
     "offsets": [
-      { "x": 0.025, "y": 0.05, "z": 0.5, "heading": 179.99996948242188 }
+      { "x": 0.025, "y": 0.05, "z": 0.5, "heading": 179.99996948242188 },
+      { "x": -0.05, "y": 0.05, "z": 0.5, "heading": 179.99996948242188 }
     ],
     "poses": {
       "show": {
-        "Sit at Table": {
-          "PROP_HUMAN_PASSED_OUT_TABLE": 1,
-          "PROP_HUMAN_SEAT_CHAIR_TABLE_DRINKING": 1,
-          "PROP_HUMAN_SEAT_CHAIR_TABLE_DRINKING_MOONSHINE": 1,
-          "PROP_HUMAN_SEAT_CHAIR_TABLE_DRINKING_WHISKEY_MOONSHINE": 1
-        }
+        "Sit at Table": [
+          ["PROP_HUMAN_PASSED_OUT_TABLE"],
+          ["PROP_HUMAN_SEAT_CHAIR_TABLE_DRINKING_MOONSHINE"],
+          ["PROP_HUMAN_SEAT_CHAIR_TABLE_DRINKING_WHISKEY_MOONSHINE"],
+          ["PROP_HUMAN_SEAT_CHAIR_TABLE_DRINKING"]
+        ]
+      },
+      "noshow": {}
+    }
+  },
+  {
+    "item": 1057555344,
+    "offsets": [
+      { "x": -0.48548419347929, "y": -0.01733962201217, "z": 0.5, "heading": 183.0000295639038 },
+      { "x": -0.0024398115866, "y": 0.09064250706442, "z": 0.5, "heading": 179.99999904632569 },
+      { "x": 0.59756018841339, "y": 0.03064250706442, "z": 0.5, "heading": 179.99999904632569 },
+      { "x": 0.05, "y": -0.135, "z": 0.5, "heading": 270.0 }
+    ],
+    "poses": {
+      "show": {
+        "Seat Bench": [
+          ["PROP_HUMAN_SEAT_BENCH"],
+          ["PROP_HUMAN_SEAT_BENCH_CONCERTINA"],
+          ["PROP_HUMAN_SEAT_BENCH_TIRED"],
+          ["PROP_HUMAN_SEAT_BENCH_JAW_HARP"],
+          ["PROP_HUMAN_SEAT_BENCH_PORCH_DRINKING_MOONSHINE"],
+          ["PROP_HUMAN_SEAT_BENCH_CONCERTINA_DOWNBEAT"],
+          ["PROP_HUMAN_SEAT_BENCH_CONCERTINA_UPBEAT"],
+          ["PROP_HUMAN_SEAT_BENCH_PORCH"]
+        ],
+        "Sleep Bed Pillow": [
+          ["PROP_HUMAN_SLEEP_BED_PILLOW"]
+        ]
+      },
+      "noshow": {}
+    }
+  },
+  {
+    "item": 1229219138,
+    "offsets": [
+      { "x": 0.45858014446913, "y": 0.04788749017986, "z": 0.50067138671875, "heading": 180.00000190734864 },
+      { "x": -0.4239563352384, "y": 0.04791048855256, "z": 0.4991226196289, "heading": 180.00000190734864 }
+    ],
+    "poses": {
+      "show": {
+        "Seat Bench": [
+          ["PROP_HUMAN_SEAT_BENCH"],
+          ["PROP_HUMAN_SEAT_BENCH_CONCERTINA"],
+          ["PROP_HUMAN_SEAT_BENCH_CONCERTINA_DOWNBEAT"],
+          ["PROP_HUMAN_SEAT_BENCH_CONCERTINA_UPBEAT"],
+          ["PROP_HUMAN_SEAT_BENCH_FIDDLE"],
+          ["PROP_HUMAN_SEAT_BENCH_FIDDLE_DOWNBEAT"],
+          ["PROP_HUMAN_SEAT_BENCH_PORCH"],
+          ["PROP_HUMAN_SEAT_BENCH_PORCH_DRINKING_MOONSHINE"],
+          ["PROP_HUMAN_SEAT_BENCH_TIRED"],
+          ["PROP_HUMAN_SEAT_BENCH_HARMONICA"],
+          ["PROP_HUMAN_SEAT_BENCH_HARMONICA_DOWNBEAT"],
+          ["PROP_HUMAN_SEAT_BENCH_HARMONICA_UPBEAT"],
+          ["PROP_HUMAN_SEAT_BENCH_JAW_HARP"],
+          ["PROP_HUMAN_SEAT_BENCH_JAW_HARP_DOWNBEAT"],
+          ["PROP_HUMAN_SEAT_BENCH_JAW_HARP_UPBEAT"]
+        ]
+      },
+      "noshow": {}
+    }
+  },
+  {
+    "item": 1360797073,
+    "offsets": [
+      { "x": -0.00079247988936, "y": 0.09728765383737, "z": 0.5, "heading": 0.00000858306884 }
+    ],
+    "poses": {
+      "show": {
+        "Piano": [
+          ["PROP_HUMAN_PIANO"],
+          ["PROP_HUMAN_PIANO_RIVERBOAT"],
+          ["PROP_HUMAN_PIANO_UPPERCLASS"],
+          ["PROP_HUMAN_PIANO_SKETCHY"]
+        ]
       },
       "noshow": {}
     }

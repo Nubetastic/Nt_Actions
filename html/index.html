@@ -8,10 +8,18 @@
 </head>
 <body>
     <aside id="navigation" aria-hidden="true">
-        <div class="nav-panel menu-surface">
+        <div class="nav-layout">
+            <aside id="nav-coordinates" class="nav-coordinates menu-surface">
+                <div class="coord-title">Points</div>
+                <div id="nav-coordinate-list" class="nav-coordinate-list"></div>
+            </aside>
+            <div class="nav-panel menu-surface">
             <header class="nav-header">
                 <h1 id="nav-title">Menu</h1>
-                <button id="nav-close" class="panel-close" type="button">Close</button>
+                <div class="nav-header-actions">
+                    <button id="nav-mod" class="panel-close nav-mod" type="button">Mod</button>
+                    <button id="nav-close" class="panel-close" type="button">Close</button>
+                </div>
             </header>
             <label id="nav-scale-control" class="nav-scale-control" for="nav-scale">
                 <span>Scale</span>
@@ -20,15 +28,26 @@
             </label>
             <div id="nav-options" class="nav-options"></div>
             <div id="nav-description" class="nav-description" aria-live="polite"></div>
+            <label id="nav-review-camera" class="nav-review-camera" for="nav-review-zoom">
+                <span>Camera</span>
+                <input id="nav-review-zoom" class="slider" type="range" min="0.75" max="8" step="0.25" value="3">
+                <output id="nav-review-zoom-value" for="nav-review-zoom">3.00 m</output>
+            </label>
             <footer class="nav-footer">
                 <button id="nav-back" type="button">Back</button>
                 <div id="nav-footer-actions" class="nav-footer-actions"></div>
             </footer>
             <div class="nav-help">Arrow keys to navigate &bull; Enter to select</div>
+            </div>
         </div>
     </aside>
     <main id="fine-tune" aria-hidden="true">
         <div class="panel menu-surface">
+            <aside class="editor-coords">
+                <div class="coord-title">Points</div>
+                <div id="editor-coord-list" class="editor-coord-list"></div>
+            </aside>
+            <div class="editor-main">
             <div id="editor-title" class="title">Fine tune position</div>
             <div class="control-row">
                 <section class="control-group">
@@ -66,12 +85,13 @@
                 <output id="camera-zoom-value">3.00 m</output>
             </div>
             <div class="camera-hint">Hold right mouse button to orbit the camera around the player</div>
-            <div class="editor-options">
-                <label id="point-coords-option" class="save unavailable"><input id="point-coords" type="checkbox" disabled> Get Point Coords</label>
+            <div id="separate-point-option" class="editor-options hidden">
+                <label class="save"><input id="separate-point" type="checkbox"> Add as new point</label>
             </div>
             <div class="actions">
                 <button id="cancel" class="secondary">Cancel</button>
                 <button id="confirm" class="confirm">&#10003; Confirm</button>
+            </div>
             </div>
         </div>
     </main>

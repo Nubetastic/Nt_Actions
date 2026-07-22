@@ -5,12 +5,17 @@ local selectedModel
 local selectedGroup
 local selectedScenario
 local currentOffset
-local currentLibrary = {}
+local currentLibrary = { records = {}, offsets = {} }
 local canDeleteGroups = false
+local modModeActive = false
 local activePose
 local editorPreviousPose
 local editorOrigin
-local availablePointOffset
+local editorMode
+local editorCoordNumber
+local availablePointOffsets = {}
+local pointScanSession = 0
+local selectedMenuCoord = 1
 local objectMenuVisible = false
 local fineTuneActive = false
 local editorOpening = false
@@ -44,7 +49,7 @@ local function defaultEditorStep()
     return tonumber(editorSettings.DefaultStep) or 0.025
 end
 
--- Shared client state used by both the ox_target and L-key interfaces.
+-- Shared client state for object targeting, pose playback, and review previews.
 inPose = inPose == true
 cachedPoseObject = cachedPoseObject or nil
 
@@ -70,6 +75,15 @@ local function copyOffset(value)
         z = tonumber(value.z) or 0.0,
         heading = tonumber(value.heading) or 0.0,
     }
+end
+
+local function sameOffset(a, b)
+    if not a or not b then return false end
+    local epsilon = 0.0001
+    return math.abs((a.x or 0.0) - (b.x or 0.0)) <= epsilon
+        and math.abs((a.y or 0.0) - (b.y or 0.0)) <= epsilon
+        and math.abs((a.z or 0.0) - (b.z or 0.0)) <= epsilon
+        and math.abs((a.heading or 0.0) - (b.heading or 0.0)) <= epsilon
 end
 
 local function copyTransform(value)
@@ -157,6 +171,17 @@ local function poseLabel(groupName, entry)
     return prettyWords(name)
 end
 
+local function numberedPoseLabel(groupName, entry, poseNumber)
+    local label = poseLabel(groupName, entry)
+    return poseNumber and ('%s - %d'):format(label, poseNumber) or label
+end
+
+local function configuredEntry(groupName, scenarioName)
+    for _, entry in ipairs(groupPoses(groupName)) do
+        if entry[1] == scenarioName then return entry end
+    end
+end
+
 local function objectExists(entity)
     return entity and entity ~= 0 and DoesEntityExist(entity)
 end
@@ -224,11 +249,6 @@ CreateThread(function()
     end
 end)
 
-local function poseOffset(groupName, scenarioName)
-    local pose = currentLibrary[groupName] and currentLibrary[groupName][scenarioName]
-    return pose and pose.offset or nil
-end
-
 local function pointToObjectOffset(pointCoords, pointHeading)
     if not objectExists(selectedObject) then return nil end
     local objectCoords = GetEntityCoords(selectedObject)
@@ -242,28 +262,88 @@ local function pointToObjectOffset(pointCoords, pointHeading)
     }
 end
 
-local function findPointOffsetAtPlayer()
+local function scanPointOffsetsAtPlayer()
     local makeBlob = string.blob or function(length) return string.rep('\0', math.max(41, length)) end
     local buffer = makeBlob(256 * 4)
+    local maximum = math.max(1, math.floor(tonumber(ConfigTarget.PointScanLimit) or 16))
     local found = Citizen.InvokeNative(
         0x345EC3B7EBDE1CB5,
         GetEntityCoords(PlayerPedId()),
         tonumber(ConfigTarget.PointSearchDistance) or 0.5,
         buffer,
-        16
+        maximum
     )
-    if not found or found < 1 then return nil end
+    if not found or found < 1 then return {} end
 
-    local unpacked, pointId = pcall(string.unpack, '<i4', buffer, 9)
-    if not unpacked or not pointId then return nil end
-    local coords = Citizen.InvokeNative(0xA8452DD321607029, pointId, true, Citizen.ResultAsVector())
-    if not coords then return nil end
-    local heading = GetEntityHeading(PlayerPedId())
-    if GetScenarioPointHeading then
-        local ok, pointHeading = pcall(GetScenarioPointHeading, pointId, true)
-        if ok and pointHeading then heading = pointHeading end
+    local result = {}
+    for index = 1, math.min(found, maximum) do
+        local unpacked, pointId = pcall(string.unpack, '<i4', buffer, 9 + ((index - 1) * 8))
+        if unpacked and pointId and pointId ~= 0 then
+            local attached = Citizen.InvokeNative(0x7467165EE97D3C68, pointId)
+            if not attached or attached == 0 or attached == selectedObject then
+                local coords = Citizen.InvokeNative(0xA8452DD321607029, pointId, true, Citizen.ResultAsVector())
+                if coords then
+                    local heading = Citizen.InvokeNative(
+                        0xB93EA7184BAA85C3,
+                        pointId,
+                        true,
+                        Citizen.ResultAsFloat()
+                    )
+                    heading = tonumber(heading) or GetEntityHeading(PlayerPedId())
+                    local offset = pointToObjectOffset(coords, heading)
+                    if offset then
+                        result[#result + 1] = {
+                            coords = { x = coords.x, y = coords.y, z = coords.z },
+                            heading = heading,
+                            offset = offset,
+                        }
+                    end
+                end
+            end
+        end
     end
-    return pointToObjectOffset(coords, heading)
+    return result
+end
+
+local function collectPointOffsets()
+    local added = false
+    for _, candidate in ipairs(scanPointOffsetsAtPlayer()) do
+        local duplicate = false
+        for _, saved in ipairs(currentLibrary.offsets or {}) do
+            if sameOffset(saved, candidate.offset) then duplicate = true break end
+        end
+        if not duplicate then
+            for _, discovered in ipairs(availablePointOffsets) do
+                if sameOffset(discovered.offset, candidate.offset) then duplicate = true break end
+            end
+        end
+        if not duplicate then
+            availablePointOffsets[#availablePointOffsets + 1] = candidate
+            added = true
+        end
+    end
+    if added and fineTuneActive then
+        SendNUIMessage({ action = 'editorPoints', points = availablePointOffsets })
+    end
+end
+
+local function startPointScanner()
+    pointScanSession = pointScanSession + 1
+    local session = pointScanSession
+    local previous = GetEntityCoords(PlayerPedId())
+    CreateThread(function()
+        while fineTuneActive and session == pointScanSession do
+            Wait(math.max(100, math.floor(tonumber(ConfigTarget.PointScanInterval) or 350)))
+            if not fineTuneActive or session ~= pointScanSession then break end
+            local coords = GetEntityCoords(PlayerPedId())
+            local dx, dy, dz = coords.x - previous.x, coords.y - previous.y, coords.z - previous.z
+            local threshold = math.max(0.01, tonumber(ConfigTarget.PointScanMoveThreshold) or 0.1)
+            if (dx * dx) + (dy * dy) + (dz * dz) >= threshold * threshold then
+                previous = coords
+                collectPointOffsets()
+            end
+        end
+    end)
 end
 
 local function scenarioTransform(entity, offset)
@@ -273,8 +353,7 @@ local function scenarioTransform(entity, offset)
     return coords, heading
 end
 
-local function startScenario(entity, scenarioName, offset)
-    local coords, heading = scenarioTransform(entity, offset)
+local function startScenarioAtTransform(scenarioName, coords, heading)
     if not coords then return false end
     local ped = PlayerPedId()
     if posePropTracking and not posePropCleanupPending then
@@ -299,11 +378,17 @@ local function startScenario(entity, scenarioName, offset)
     return true
 end
 
-local function usePose(groupName, scenarioName)
-    local offset = poseOffset(groupName, scenarioName)
+local function startScenario(entity, scenarioName, offset)
+    local coords, heading = scenarioTransform(entity, offset)
+    return startScenarioAtTransform(scenarioName, coords, heading)
+end
+
+local function usePose(groupName, scenarioName, coordNumber)
+    coordNumber = tonumber(coordNumber) or 1
+    local offset = currentLibrary.offsets[coordNumber]
     local origin = activePose and copyTransform(activePose.origin) or pedTransform(PlayerPedId())
     if not offset or not startScenario(selectedObject, scenarioName, offset) then
-        notify('That object is no longer available.', 'error')
+        notify('That object has no usable point.', 'error')
         return
     end
     setActivePose({
@@ -311,6 +396,7 @@ local function usePose(groupName, scenarioName)
         model = selectedModel,
         group = groupName,
         scenario = scenarioName,
+        coordNumber = coordNumber,
         offset = copyOffset(offset),
         origin = origin,
     })
@@ -406,7 +492,7 @@ local function resurrectAfterPoseExit(ped, origin, poseCoords)
         destination.y,
         destination.z,
         destination.heading,
-        true,
+        false,
         false
     )
     SetEntityHealth(PlayerPedId(), health)
@@ -433,7 +519,7 @@ local function leavePose()
         origin.y,
         origin.z,
         origin.heading,
-        true,
+        false,
         false
     )
     setActivePose(nil)
@@ -441,38 +527,40 @@ end
 
 local function refreshLibrary()
     local response = lib.callback.await('nt_actions:server:getObjectLibrary', false, selectedModel) or {}
-    local catalog = {}
-    for _, groupName in ipairs(orderedGroups()) do
-        catalog[groupName] = {}
-        for _, entry in ipairs(groupPoses(groupName)) do
-            if entry[1] then
-                catalog[groupName][entry[1]] = {
-                    show = false,
-                    stored = false,
-                }
-            end
-        end
-    end
-
     local library = type(response.library) == 'table' and response.library or {}
     local offsets = type(library.offsets) == 'table' and library.offsets or {}
     local savedPoses = type(library.poses) == 'table' and library.poses or {}
+    local records = {}
     for _, visibility in ipairs({ 'show', 'noshow' }) do
         for groupName, poses in pairs(type(savedPoses[visibility]) == 'table' and savedPoses[visibility] or {}) do
-            for scenarioName, offsetIndex in pairs(type(poses) == 'table' and poses or {}) do
-                local pose = catalog[groupName] and catalog[groupName][scenarioName]
-                local offset = offsets[tonumber(offsetIndex)]
-                if pose and offset then
-                    pose.stored = true
-                    pose.show = visibility == 'show'
-                    pose.offset = copyOffset(offset)
+            for _, value in ipairs(type(poses) == 'table' and poses or {}) do
+                local scenarioName = value.scenario or value[1]
+                if configuredEntry(groupName, scenarioName) then
+                    records[#records + 1] = {
+                        group = groupName,
+                        scenario = scenarioName,
+                        visibility = visibility,
+                    }
                 end
             end
         end
     end
-
-    currentLibrary = catalog
+    table.sort(records, function(a, b)
+        if a.visibility ~= b.visibility then return a.visibility == 'show' end
+        if a.group ~= b.group then return a.group:lower() < b.group:lower() end
+        if a.scenario ~= b.scenario then return a.scenario:lower() < b.scenario:lower() end
+        return false
+    end)
+    currentLibrary = { records = records, offsets = offsets }
+    if activePose and activePose.model == selectedModel then
+        local coordNumber
+        for index, offset in ipairs(offsets) do
+            if sameOffset(offset, activePose.offset) then coordNumber = index break end
+        end
+        activePose.coordNumber = coordNumber
+    end
     canDeleteGroups = response.canDelete == true
+    if not canDeleteGroups then modModeActive = false end
 end
 
 local function cameraTargetCoords()
@@ -558,14 +646,16 @@ end
 
 local function closeFineTune()
     fineTuneActive = false
+    pointScanSession = pointScanSession + 1
     editorOpening = false
+    poseMenuBlockedUntil = 0
     cameraLookActive = false
     stopFineTuneCamera(false)
     SetNuiFocus(false, false)
     SendNUIMessage({ action = 'close' })
 end
 
-local function beginEditor(groupName, scenarioName, mode)
+local function beginEditor(groupName, scenarioName, mode, coordNumber)
     if not objectExists(selectedObject) then
         notify('That object is no longer available.', 'error')
         return
@@ -581,23 +671,27 @@ local function beginEditor(groupName, scenarioName, mode)
     objectMenuVisible = false
     selectedGroup = groupName
     selectedScenario = scenarioName
+    editorMode = mode
+    editorCoordNumber = tonumber(coordNumber)
     editorPreviousPose = activePose and {
         entity = activePose.entity,
         model = activePose.model,
         group = activePose.group,
         scenario = activePose.scenario,
+        coordNumber = activePose.coordNumber,
         offset = copyOffset(activePose.offset),
         origin = copyTransform(activePose.origin),
     } or nil
     editorOrigin = pedTransform(PlayerPedId())
-    local savedOffset = poseOffset(groupName, scenarioName)
+    local savedOffset = mode == 'modify' and editorCoordNumber and currentLibrary.offsets[editorCoordNumber] or nil
     local activeObjectOffset = mode == 'add'
         and activePose
         and activePose.entity == selectedObject
         and activePose.offset
         or nil
-    currentOffset = copyOffset(savedOffset or activeObjectOffset)
-    availablePointOffset = nil
+    local selectedPointOffset = mode == 'add' and currentLibrary.offsets[selectedMenuCoord] or nil
+    currentOffset = copyOffset(savedOffset or activeObjectOffset or selectedPointOffset)
+    availablePointOffsets = {}
     editorOpening = true
 
     NtMenu.hide(false)
@@ -613,7 +707,7 @@ local function beginEditor(groupName, scenarioName, mode)
         notify('That object is no longer available.', 'error')
         return
     end
-    availablePointOffset = findPointOffsetAtPlayer()
+    collectPointOffsets()
 
     local gameplayCameraCoords = GetGameplayCamCoord()
     local objectCoords = GetEntityCoords(selectedObject)
@@ -621,16 +715,17 @@ local function beginEditor(groupName, scenarioName, mode)
     startFineTuneCamera(objectCoords, gameplayCameraCoords, heading)
     fineTuneActive = true
     editorOpening = false
+    startPointScanner()
     local cameraZoomMin = tonumber(ConfigTarget.CameraZoomMin) or 0.75
     local cameraZoomMax = math.max(cameraZoomMin, tonumber(ConfigTarget.CameraZoomMax) or 8.0, orbitRadius)
     SetNuiFocus(true, true)
     SendNUIMessage({
         action = 'open',
         editorTitle = mode == 'modify'
-            and (editorSettings.ModifyTitle or 'Modify pose')
+            and (editorSettings.ModifyTitle or 'Modify point')
             or (editorSettings.AddTitle or 'Add pose'),
         scale = NtMenu.getScale(),
-        pointAvailable = availablePointOffset ~= nil,
+        points = availablePointOffsets,
         step = defaultEditorStep(),
         stepMin = ConfigTarget.FineTuneStepMin,
         stepMax = ConfigTarget.FineTuneStepMax,
@@ -641,6 +736,9 @@ local function beginEditor(groupName, scenarioName, mode)
         cameraZoomMax = cameraZoomMax,
         cameraZoomStep = ConfigTarget.CameraZoomStep,
         offset = currentOffset,
+        coordinates = currentLibrary.offsets,
+        selectedCoordinate = editorCoordNumber or selectedMenuCoord,
+        showSeparatePoint = mode == 'modify',
     })
 end
 
@@ -649,11 +747,14 @@ local function openAddPoseMenu(groupName)
     local options = {}
     for _, entry in ipairs(groupPoses(groupName)) do
         local scenarioName = entry[1]
-        local pose = scenarioName and currentLibrary[groupName] and currentLibrary[groupName][scenarioName]
-        if pose and not pose.stored and compatible(entry) then
+        if scenarioName and compatible(entry) then
+            local existing = 0
+            for _, record in ipairs(currentLibrary.records or {}) do
+                if record.group == groupName and record.scenario == scenarioName then existing = existing + 1 end
+            end
             options[#options + 1] = {
                 label = poseLabel(groupName, entry),
-                description = groupName,
+                description = existing > 0 and ('%s - %d saved'):format(groupName, existing) or groupName,
                 args = { scenario = scenarioName },
             }
         end
@@ -671,9 +772,7 @@ local function openAddGroupMenu()
     for _, groupName in ipairs(orderedGroups()) do
         local available = 0
         for _, entry in ipairs(groupPoses(groupName)) do
-            local scenarioName = entry[1]
-            local pose = scenarioName and currentLibrary[groupName] and currentLibrary[groupName][scenarioName]
-            if pose and not pose.stored and compatible(entry) then available = available + 1 end
+            if entry[1] and compatible(entry) then available = available + 1 end
         end
         if available > 0 then
             options[#options + 1] = {
@@ -692,10 +791,8 @@ end
 
 local function hiddenPoseCount()
     local count = 0
-    for _, poses in pairs(currentLibrary) do
-        for _, pose in pairs(poses) do
-            if pose.stored and not pose.show then count = count + 1 end
-        end
+    for _, record in ipairs(currentLibrary.records or {}) do
+        if record.visibility == 'noshow' then count = count + 1 end
     end
     return count
 end
@@ -704,23 +801,23 @@ local function openUndoMenu()
     if not canDeleteGroups then return end
     objectMenuVisible = false
     local options = {}
-    for _, groupName in ipairs(orderedGroups()) do
-        for _, entry in ipairs(groupPoses(groupName)) do
-            local pose = entry[1] and currentLibrary[groupName] and currentLibrary[groupName][entry[1]]
-            if pose and pose.stored and not pose.show then
-                local label = poseLabel(groupName, entry)
-                options[#options + 1] = {
-                    label = label,
-                    description = groupName,
-                    disabled = true,
-                    restorable = true,
-                    args = {
-                        group = groupName,
-                        scenario = entry[1],
-                        poseLabel = label,
-                    },
-                }
-            end
+    for _, record in ipairs(currentLibrary.records or {}) do
+        if record.visibility == 'noshow' then
+            local entry = configuredEntry(record.group, record.scenario)
+            local label = poseLabel(record.group, entry)
+            options[#options + 1] = {
+                label = label,
+                description = record.group,
+                disabled = true,
+                restorable = true,
+                deletable = true,
+                args = {
+                    action = 'hiddenPose',
+                    group = record.group,
+                    scenario = record.scenario,
+                    poseLabel = label,
+                },
+            }
         end
     end
     if #options == 0 then
@@ -735,7 +832,8 @@ local function openUndoMenu()
                 false,
                 selectedModel,
                 args.group,
-                args.scenario
+                args.scenario,
+                args.number or 0
             )
             if not restored then
                 notify('You do not have permission to restore that pose.', 'error')
@@ -745,34 +843,146 @@ local function openUndoMenu()
             NtMenu.hide(false)
             openObjectMenu(selectedObject)
         end,
+        onDelete = function(_, args)
+            local deleted = lib.callback.await(
+                'nt_actions:server:deleteHiddenObjectPose', false,
+                selectedModel, args.group, args.scenario, args.number or 0
+            )
+            if not deleted then notify('That hidden pose could not be deleted.', 'error') return end
+            notify(('%s was permanently deleted.'):format(args.poseLabel or 'Pose'), 'success')
+            NtMenu.hide(false)
+            openObjectMenu(selectedObject)
+            openUndoMenu()
+        end,
     })
+end
+
+local function savedPoseVisibility(groupName, scenarioName)
+    for _, record in ipairs(currentLibrary.records or {}) do
+        if record.group == groupName and record.scenario == scenarioName then return record.visibility end
+    end
+end
+
+local function openMultiAddGroupMenu(groupName)
+    local selected = {}
+    local options = {}
+    local footer = {
+        { label = 'Add Selected', disabled = true, args = { action = 'addSelected' } },
+    }
+
+    for _, entry in ipairs(groupPoses(groupName)) do
+        local scenarioName = entry[1]
+        if scenarioName then
+            local visibility = savedPoseVisibility(groupName, scenarioName)
+            options[#options + 1] = {
+                label = poseLabel(groupName, entry),
+                description = visibility == 'show' and 'Already published.'
+                    or visibility == 'noshow' and 'Hidden by a moderator.'
+                    or groupName,
+                disabled = visibility ~= nil,
+                checkable = visibility == nil,
+                checked = false,
+                args = { group = groupName, scenario = scenarioName },
+            }
+        end
+    end
+
+    local function updateSelectionState()
+        local count = 0
+        for _ in pairs(selected) do count = count + 1 end
+        footer[1].disabled = count == 0
+        footer[1].label = count > 0 and ('Add Selected (%d)'):format(count) or 'Add Selected'
+    end
+
+    NtMenu.open(('Multi Add - %s'):format(groupName), options, function() end, nil, {
+        footerActions = footer,
+        onCheck = function(_, args, value)
+            selected[args.scenario] = value == true
+                and { group = args.group, scenario = args.scenario }
+                or nil
+            updateSelectionState()
+            NtMenu.refreshFooter()
+        end,
+        onFooter = function(_, args)
+            if args.action ~= 'addSelected' then return end
+            local request = {}
+            for _, selection in pairs(selected) do request[#request + 1] = selection end
+            table.sort(request, function(a, b)
+                if a.group ~= b.group then return a.group < b.group end
+                return a.scenario < b.scenario
+            end)
+            local result = lib.callback.await('nt_actions:server:bulkAddObjectPoses', false, selectedModel, request)
+            if type(result) ~= 'table' then
+                notify('The selected poses could not be added.', 'error')
+                return
+            end
+            notify(('%d poses added; %d skipped.'):format(result.added or 0, result.skipped or 0), 'success')
+            NtMenu.hide(false)
+            openObjectMenu(selectedObject)
+        end,
+    })
+end
+
+local function openMultiAddMenu()
+    local options = {}
+    for _, groupName in ipairs(orderedGroups()) do
+        local available = 0
+        for _, entry in ipairs(groupPoses(groupName)) do
+            if entry[1] and not savedPoseVisibility(groupName, entry[1]) then available = available + 1 end
+        end
+        options[#options + 1] = {
+            label = groupName,
+            description = available > 0
+                and ('%d pose%s available.'):format(available, available == 1 and '' or 's')
+                or 'Every pose in this group is already published or hidden.',
+            disabled = available == 0,
+            args = { group = groupName },
+        }
+    end
+    if #options == 0 then
+        options[1] = { label = 'No pose groups configured', disabled = true }
+    end
+
+    NtMenu.open('Multi Add - Select Group', options, function(_, args)
+        openMultiAddGroupMenu(args.group)
+    end)
 end
 
 openObjectMenu = function(entity)
     if fineTuneActive or not objectExists(entity) then return end
+    local objectChanged = selectedObject ~= entity
+    if objectChanged then
+        modModeActive = false
+        selectedMenuCoord = 1
+    end
     selectedObject = entity
     selectedModel = GetEntityModel(entity)
     refreshLibrary()
+    if activePose and activePose.entity == selectedObject and activePose.coordNumber then
+        selectedMenuCoord = activePose.coordNumber
+    elseif not inPose then
+        selectedMenuCoord = 1
+    end
+    if #currentLibrary.offsets > 0 then
+        selectedMenuCoord = math.max(1, math.min(#currentLibrary.offsets, tonumber(selectedMenuCoord) or 1))
+    else
+        selectedMenuCoord = 1
+    end
     objectMenuVisible = true
 
     local options = {}
-    for _, groupName in ipairs(orderedGroups()) do
-        for _, entry in ipairs(groupPoses(groupName)) do
-            local pose = entry[1] and currentLibrary[groupName] and currentLibrary[groupName][entry[1]]
-            if pose and pose.show and compatible(entry) then
-                local label = poseLabel(groupName, entry)
-                options[#options + 1] = {
-                    label = label,
-                    description = groupName,
-                    deletable = canDeleteGroups,
-                    args = {
-                        action = 'pose',
-                        group = groupName,
-                        scenario = entry[1],
-                        poseLabel = label,
-                    },
-                }
-            end
+    for _, record in ipairs(currentLibrary.records or {}) do
+        local entry = configuredEntry(record.group, record.scenario)
+        if record.visibility == 'show' and entry and compatible(entry) then
+            local label = poseLabel(record.group, entry)
+            options[#options + 1] = {
+                label = label,
+                description = record.group,
+                deletable = canDeleteGroups and modModeActive,
+                args = {
+                    action = 'pose', group = record.group, scenario = record.scenario, poseLabel = label,
+                },
+            }
         end
     end
     if #options == 0 then
@@ -780,11 +990,19 @@ openObjectMenu = function(entity)
     end
 
     local isActiveObject = activePose and activePose.entity == selectedObject
-    local footer = {
-        { label = configuredText('AddPose', 'Add Pose'), args = { action = 'add' } },
-    }
+    local moderatorEditing = canDeleteGroups and modModeActive
+    local footer = {}
+    if moderatorEditing then
+        footer[#footer + 1] = { label = configuredText('AddPose', 'Add Pose'), args = { action = 'add' } }
+    end
     if isActiveObject then
-        footer[#footer + 1] = { label = configuredText('Modify', 'Modify'), args = { action = 'modify' } }
+        if moderatorEditing then
+            footer[#footer + 1] = {
+                label = configuredText('Modify', 'Modify'),
+                disabled = not activePose.coordNumber,
+                args = { action = 'modify' },
+            }
+        end
         footer[#footer + 1] = { label = configuredText('Leave', 'Leave Pose'), args = { action = 'leave' } }
     elseif inPose then
         footer[#footer + 1] = { label = configuredText('Leave', 'Leave Pose'), args = { action = 'leave' } }
@@ -792,25 +1010,35 @@ openObjectMenu = function(entity)
     else
         footer[#footer + 1] = { label = configuredText('Exit', 'Exit'), args = { action = 'exit' } }
     end
-    if canDeleteGroups then
+    if moderatorEditing then
         footer[#footer + 1] = {
-            label = configuredText('Undo', 'Undo'),
-            disabled = hiddenPoseCount() == 0,
+            label = 'Multi Add',
+            args = { action = 'multiAdd' },
+        }
+        footer[#footer + 1] = {
+            label = configuredText('Undo', 'Undo'), disabled = hiddenPoseCount() == 0,
             args = { action = 'undo' },
         }
     end
 
     NtMenu.open(configuredText('ObjectTitle', 'Object Poses'), options, function(_, args)
-        if args.action == 'pose' then usePose(args.group, args.scenario) end
+        if args.action == 'pose' then usePose(args.group, args.scenario, selectedMenuCoord) end
     end, function()
         objectMenuVisible = false
     end, {
         footerActions = footer,
+        showMod = canDeleteGroups,
+        modActive = modModeActive,
+        onMod = function()
+            modModeActive = not modModeActive
+            NtMenu.hide(false)
+            openObjectMenu(selectedObject)
+        end,
         onFooter = function(_, args)
             if args.action == 'add' then
                 openAddGroupMenu()
-            elseif args.action == 'modify' and activePose then
-                beginEditor(activePose.group, activePose.scenario, 'modify')
+            elseif args.action == 'modify' and activePose and activePose.coordNumber then
+                beginEditor(activePose.group, activePose.scenario, 'modify', activePose.coordNumber)
             elseif args.action == 'leave' then
                 leavePose()
                 objectMenuVisible = false
@@ -820,30 +1048,42 @@ openObjectMenu = function(entity)
                 NtMenu.hide(false)
             elseif args.action == 'undo' then
                 openUndoMenu()
+            elseif args.action == 'multiAdd' then
+                openMultiAddMenu()
             end
         end,
         onDelete = function(_, args)
             objectMenuVisible = false
             local removed = lib.callback.await(
-                'nt_actions:server:hideObjectPose',
-                false,
-                selectedModel,
-                args.group,
-                args.scenario
-            )
+                'nt_actions:server:hideObjectPose', false,
+                selectedModel, args.group, args.scenario, 0)
             if not removed then
                 objectMenuVisible = true
                 notify('You do not have permission to remove that pose.', 'error')
                 return
             end
-            if activePose
-                and activePose.entity == selectedObject
-                and activePose.group == args.group
+            if activePose and activePose.entity == selectedObject and activePose.group == args.group
                 and activePose.scenario == args.scenario
             then
                 leavePose()
             end
             notify(('%s was hidden from this object.'):format(args.poseLabel or 'Pose'), 'success')
+            NtMenu.hide(false)
+            openObjectMenu(selectedObject)
+        end,
+        coordinates = currentLibrary.offsets,
+        selectedCoordinate = selectedMenuCoord,
+        coordinatesDeletable = canDeleteGroups and modModeActive,
+        onCoordinateSelect = function(coordNumber)
+            if currentLibrary.offsets[coordNumber] then selectedMenuCoord = coordNumber end
+        end,
+        onCoordinateDelete = function(coordNumber)
+            local removed = lib.callback.await('nt_actions:server:deleteObjectPoint', false, selectedModel, coordNumber)
+            if not removed then
+                notify('That point could not be removed. Objects with poses must retain at least one point.', 'error')
+                return
+            end
+            notify(('Point %d was removed.'):format(coordNumber), 'success')
             NtMenu.hide(false)
             openObjectMenu(selectedObject)
         end,
@@ -949,14 +1189,30 @@ RegisterNUICallback('cameraZoom', function(data, cb)
     cb({ ok = true, distance = orbitRadius })
 end)
 
-RegisterNUICallback('pointCoords', function(_, cb)
-    if not fineTuneActive or not availablePointOffset then cb({ ok = false }) return end
-    currentOffset = copyOffset(availablePointOffset)
-    local ok = startScenario(selectedObject, selectedScenario, currentOffset)
+RegisterNUICallback('selectEditorCoord', function(data, cb)
+    if not fineTuneActive then cb({ ok = false }) return end
+    local coordNumber = tonumber(data.coordNumber)
+    local selected = coordNumber and currentLibrary.offsets[coordNumber] or nil
+    local pointIndex = tonumber(data.pointIndex)
+    local point
+    if pointIndex then
+        point = availablePointOffsets[pointIndex]
+        selected = point and point.offset or nil
+    elseif selected then
+        editorCoordNumber = coordNumber
+    end
+    if not selected then cb({ ok = false }) return end
+    currentOffset = copyOffset(selected)
+    local ok
+    if point then
+        ok = startScenarioAtTransform(selectedScenario, point.coords, point.heading)
+    else
+        ok = startScenario(selectedObject, selectedScenario, currentOffset)
+    end
     cb({ ok = ok, offset = currentOffset })
 end)
 
-RegisterNUICallback('confirm', function(_, cb)
+RegisterNUICallback('confirm', function(data, cb)
     if not fineTuneActive then cb({ ok = false }) return end
     local saved = lib.callback.await(
         'nt_actions:server:saveObjectPose',
@@ -964,33 +1220,50 @@ RegisterNUICallback('confirm', function(_, cb)
         selectedModel,
         selectedGroup,
         selectedScenario,
-        currentOffset
+        currentOffset,
+        editorMode,
+        editorCoordNumber or 0,
+        data.separate == true
     )
-    if not saved then
+    if type(saved) ~= 'table' then
         notify('The pose could not be saved.', 'error')
         cb({ ok = false })
         return
     end
 
     refreshLibrary()
-    local savedOffset = poseOffset(selectedGroup, selectedScenario) or currentOffset
+    local savedCoordNumber = tonumber(saved.coordNumber)
+    local savedOffset = savedCoordNumber and currentLibrary.offsets[savedCoordNumber] or currentOffset
     setActivePose({
         entity = selectedObject,
         model = selectedModel,
         group = selectedGroup,
         scenario = selectedScenario,
+        coordNumber = savedCoordNumber,
         offset = copyOffset(savedOffset),
         origin = editorPreviousPose and copyTransform(editorPreviousPose.origin) or copyTransform(editorOrigin),
     })
     closeFineTune()
-    notify(('%s is now available on this object.'):format(prettyWords(selectedScenario)), 'success')
+    notify(('%s and its object point were saved.'):format(prettyWords(selectedScenario)), 'success')
     cb({ ok = true })
 end)
 
 RegisterNUICallback('cancel', function(_, cb)
     if fineTuneActive then
         closeFineTune()
-        if editorPreviousPose and objectExists(editorPreviousPose.entity) then
+        if editorMode == 'add' then
+            setActivePose({
+                entity = selectedObject,
+                model = selectedModel,
+                group = selectedGroup,
+                scenario = selectedScenario,
+                coordNumber = nil,
+                offset = copyOffset(currentOffset),
+                origin = editorPreviousPose and copyTransform(editorPreviousPose.origin)
+                    or copyTransform(editorOrigin),
+            })
+            leavePose()
+        elseif editorPreviousPose and objectExists(editorPreviousPose.entity) then
             setActivePose(editorPreviousPose)
             startScenario(activePose.entity, activePose.scenario, activePose.offset)
         else
@@ -1024,3 +1297,14 @@ AddEventHandler('onResourceStop', function(resourceName)
     if posePropTracking then deleteTrackedPoseProps(PlayerPedId()) end
     if fineTuneActive then closeFineTune() end
 end)
+
+-- Narrow client API used by the isolated batch-review feature.
+NtActionsClient = NtActionsClient or {}
+NtActionsClient.copyOffset = copyOffset
+NtActionsClient.startScenario = startScenario
+NtActionsClient.finishPosePropCleanup = finishPosePropCleanup
+NtActionsClient.poseLabel = function(groupName, scenarioName, poseNumber)
+    local entry = configuredEntry(groupName, scenarioName)
+    if not entry then return prettyWords(scenarioName) end
+    return numberedPoseLabel(groupName, entry, poseNumber)
+end
