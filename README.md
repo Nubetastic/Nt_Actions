@@ -1,6 +1,6 @@
 # Nt_Actions
 
-## [Showcase](https://youtube.com/watch?v=2Ik6fkwJ1nw&feature=youtu.be)
+## [Showcase](https://www.youtube.com/watch?v=2Ik6fkwJ1nw)
 
 A RedM object-pose library for publishing reusable poses and object-relative points, with presets, point groups, global pose corrections, job-restricted moderation, and batch review.
 
