@@ -1,122 +1,250 @@
-[
+{
+  "presets": [
   {
-    "item": -847228074,
-    "offsets": [
-      { "x": 0.0, "y": -0.35, "z": 0.5, "heading": 180.0 }
-    ],
-    "poses": {
-      "show": {
-        "Sleep Bed Pillow": [
-          ["PROP_HUMAN_SLEEP_BED_PILLOW"],
-          ["PROP_HUMAN_SLEEP_BED_PILLOW_RIGHT"]
+      "name": "Bar",
+      "offsets": {
+        "Group 1": [
+          { "x": 0.12556502349028, "y": 1.10264152495513, "z": -0.55924774169922, "heading": 171.3430118560791 }
         ]
       },
-      "noshow": {}
-    }
-  },
+      "poses": {
+        "Group 1": {
+          "show": {
+            "Bar": [
+              ["WORLD_HUMAN_DRUNK_BAR_SLUMPED"],
+              ["SC_WORLD_HUMAN_STAND_BAR"],
+              ["WORLD_HUMAN_BARCUSTOMER"],
+              ["WORLD_HUMAN_DRINKING"],
+              ["WORLD_HUMAN_DRINKING_DRUNK"],
+              ["WORLD_HUMAN_DRINKING_MOONSHINE"]
+            ]
+          },
+          "noshow": {}
+        }
+      }
+    },
   {
-    "item": -382289692,
-    "offsets": [
-      { "x": 0.0, "y": 0.0, "z": 0.25, "heading": 340.0 }
-    ],
-    "poses": {
-      "show": {
-        "Seat Bench": [
-          ["PROP_HUMAN_SEAT_BENCH"]
+      "name": "Bed Single",
+      "offsets": {
+        "Group 1": [
+          { "x": 0.0, "y": -0.35, "z": 0.5, "heading": 180.0 }
         ]
       },
-      "noshow": {}
-    }
-  },
+      "poses": {
+        "Group 1": {
+          "show": {
+            "Sleep Bed Pillow": [
+              ["PROP_HUMAN_SLEEP_BED_PILLOW"],
+              ["PROP_HUMAN_SLEEP_BED_PILLOW_HIGH"],
+              ["PROP_HUMAN_SLEEP_BED_PILLOW_LEFT"],
+              ["PROP_HUMAN_SLEEP_BED_PILLOW_RIGHT"]
+            ]
+          },
+          "noshow": {}
+        }
+      }
+    },
   {
-    "item": 325252933,
-    "offsets": [
-      { "x": 0.025, "y": 0.05, "z": 0.5, "heading": 179.99996948242188 },
-      { "x": -0.05, "y": 0.05, "z": 0.5, "heading": 179.99996948242188 }
-    ],
-    "poses": {
-      "show": {
-        "Sit at Table": [
-          ["PROP_HUMAN_PASSED_OUT_TABLE"],
-          ["PROP_HUMAN_SEAT_CHAIR_TABLE_DRINKING_MOONSHINE"],
-          ["PROP_HUMAN_SEAT_CHAIR_TABLE_DRINKING_WHISKEY_MOONSHINE"],
-          ["PROP_HUMAN_SEAT_CHAIR_TABLE_DRINKING"]
-        ]
-      },
-      "noshow": {}
-    }
-  },
-  {
-    "item": 1057555344,
-    "offsets": [
-      { "x": -0.48548419347929, "y": -0.01733962201217, "z": 0.5, "heading": 183.0000295639038 },
-      { "x": -0.0024398115866, "y": 0.09064250706442, "z": 0.5, "heading": 179.99999904632569 },
-      { "x": 0.59756018841339, "y": 0.03064250706442, "z": 0.5, "heading": 179.99999904632569 },
-      { "x": 0.05, "y": -0.135, "z": 0.5, "heading": 270.0 }
-    ],
-    "poses": {
-      "show": {
-        "Seat Bench": [
-          ["PROP_HUMAN_SEAT_BENCH"],
-          ["PROP_HUMAN_SEAT_BENCH_CONCERTINA"],
-          ["PROP_HUMAN_SEAT_BENCH_TIRED"],
-          ["PROP_HUMAN_SEAT_BENCH_JAW_HARP"],
-          ["PROP_HUMAN_SEAT_BENCH_PORCH_DRINKING_MOONSHINE"],
-          ["PROP_HUMAN_SEAT_BENCH_CONCERTINA_DOWNBEAT"],
-          ["PROP_HUMAN_SEAT_BENCH_CONCERTINA_UPBEAT"],
-          ["PROP_HUMAN_SEAT_BENCH_PORCH"]
+      "name": "Bench",
+      "offsets": {
+        "Lay Down": [
+          { "x": 0.05, "y": -0.135, "z": 0.5, "heading": 270.0 }
         ],
-        "Sleep Bed Pillow": [
-          ["PROP_HUMAN_SLEEP_BED_PILLOW"]
+        "Sit": [
+          { "x": -0.48548419347929, "y": -0.01733962201217, "z": 0.5, "heading": 183.0000295639038 },
+          { "x": -0.0024398115866, "y": 0.09064250706442, "z": 0.5, "heading": 179.99999904632569 },
+          { "x": 0.59756018841339, "y": 0.03064250706442, "z": 0.5, "heading": 179.99999904632569 }
         ]
       },
-      "noshow": {}
-    }
-  },
+      "poses": {
+        "Lay Down": {
+          "show": {
+            "Sleep Bed Pillow": [
+              ["PROP_HUMAN_SLEEP_BED_PILLOW"]
+            ]
+          },
+          "noshow": {}
+        },
+        "Sit": {
+          "show": {
+            "Seat Chair": [
+              ["PROP_HUMAN_SEAT_CHAIR"],
+              ["PROP_HUMAN_SEAT_CHAIR_BANJO"],
+              ["PROP_HUMAN_SEAT_CHAIR_BANJO_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_CHAIR_BANJO_UPBEAT"],
+              ["PROP_HUMAN_SEAT_CHAIR_GUITAR"],
+              ["PROP_HUMAN_SEAT_CHAIR_DRINKING_MOONSHINE"],
+              ["PROP_HUMAN_SEAT_CHAIR_CIGAR"],
+              ["PROP_HUMAN_SEAT_CHAIR_SMOKING"],
+              ["PROP_HUMAN_SEAT_CHAIR_SMOKE_ROLL"],
+              ["PROP_HUMAN_SEAT_CHAIR_FAN"],
+              ["PROP_HUMAN_SEAT_CHAIR_KNIFE_BADASS"],
+              ["PROP_HUMAN_SEAT_CHAIR_KNITTING"],
+              ["PROP_HUMAN_SEAT_CHAIR_SEWING"],
+              ["PROP_HUMAN_SEAT_CHAIR_SKETCHING"],
+              ["PROP_HUMAN_SEAT_CHAIR_WHITTLE"],
+              ["SC_PROP_CAMP_DUTCH_SEAT_CHAIR_READING"]
+            ],
+            "Seat Bench": [
+              ["PROP_HUMAN_SEAT_BENCH"],
+              ["PROP_HUMAN_SEAT_BENCH_PORCH"],
+              ["PROP_HUMAN_SEAT_BENCH_TIRED"],
+              ["PROP_HUMAN_SEAT_BENCH_CONCERTINA"],
+              ["PROP_HUMAN_SEAT_BENCH_CONCERTINA_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_CONCERTINA_UPBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_FIDDLE"],
+              ["PROP_HUMAN_SEAT_BENCH_FIDDLE_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_FIDDLE_UPBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_HARMONICA"],
+              ["PROP_HUMAN_SEAT_BENCH_HARMONICA_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_HARMONICA_UPBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_JAW_HARP"],
+              ["PROP_HUMAN_SEAT_BENCH_JAW_HARP_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_JAW_HARP_UPBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_MANDOLIN"],
+              ["PROP_HUMAN_SEAT_BENCH_MANDOLIN_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_MANDOLIN_UPBEAT"]
+            ]
+          },
+          "noshow": {}
+        }
+      }
+    },
   {
-    "item": 1229219138,
-    "offsets": [
-      { "x": 0.45858014446913, "y": 0.04788749017986, "z": 0.50067138671875, "heading": 180.00000190734864 },
-      { "x": -0.4239563352384, "y": 0.04791048855256, "z": 0.4991226196289, "heading": 180.00000190734864 }
-    ],
-    "poses": {
-      "show": {
-        "Seat Bench": [
-          ["PROP_HUMAN_SEAT_BENCH"],
-          ["PROP_HUMAN_SEAT_BENCH_CONCERTINA"],
-          ["PROP_HUMAN_SEAT_BENCH_CONCERTINA_DOWNBEAT"],
-          ["PROP_HUMAN_SEAT_BENCH_CONCERTINA_UPBEAT"],
-          ["PROP_HUMAN_SEAT_BENCH_FIDDLE"],
-          ["PROP_HUMAN_SEAT_BENCH_FIDDLE_DOWNBEAT"],
-          ["PROP_HUMAN_SEAT_BENCH_PORCH"],
-          ["PROP_HUMAN_SEAT_BENCH_PORCH_DRINKING_MOONSHINE"],
-          ["PROP_HUMAN_SEAT_BENCH_TIRED"],
-          ["PROP_HUMAN_SEAT_BENCH_HARMONICA"],
-          ["PROP_HUMAN_SEAT_BENCH_HARMONICA_DOWNBEAT"],
-          ["PROP_HUMAN_SEAT_BENCH_HARMONICA_UPBEAT"],
-          ["PROP_HUMAN_SEAT_BENCH_JAW_HARP"],
-          ["PROP_HUMAN_SEAT_BENCH_JAW_HARP_DOWNBEAT"],
-          ["PROP_HUMAN_SEAT_BENCH_JAW_HARP_UPBEAT"]
+      "name": "Chair",
+      "offsets": {
+        "No Table": [
+          { "x": 0.025, "y": 0.05, "z": 0.5, "heading": 179.99996948242188 }
+        ],
+        "Table": [
+          { "x": -0.05, "y": 0.05, "z": 0.5, "heading": 179.99996948242188 }
         ]
       },
-      "noshow": {}
-    }
-  },
+      "poses": {
+        "No Table": {
+          "show": {
+            "Seat Chair": [
+              ["PROP_HUMAN_SEAT_CHAIR"],
+              ["PROP_HUMAN_SEAT_CHAIR_BANJO"],
+              ["PROP_HUMAN_SEAT_CHAIR_BANJO_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_CHAIR_BANJO_UPBEAT"],
+              ["PROP_HUMAN_SEAT_CHAIR_GUITAR"],
+              ["PROP_HUMAN_SEAT_CHAIR_DRINKING_MOONSHINE"],
+              ["PROP_HUMAN_SEAT_CHAIR_CIGAR"],
+              ["PROP_HUMAN_SEAT_CHAIR_SMOKING"],
+              ["PROP_HUMAN_SEAT_CHAIR_SMOKE_ROLL"],
+              ["PROP_HUMAN_SEAT_CHAIR_FAN"],
+              ["PROP_HUMAN_SEAT_CHAIR_KNIFE_BADASS"],
+              ["PROP_HUMAN_SEAT_CHAIR_KNITTING"],
+              ["PROP_HUMAN_SEAT_CHAIR_SEWING"],
+              ["PROP_HUMAN_SEAT_CHAIR_SKETCHING"],
+              ["PROP_HUMAN_SEAT_CHAIR_WHITTLE"],
+              ["SC_PROP_CAMP_DUTCH_SEAT_CHAIR_READING"]
+            ]
+          },
+          "noshow": {}
+        },
+        "Table": {
+          "show": {
+            "Sit at Table": [
+              ["PROP_HUMAN_SEAT_CHAIR_TABLE_DRINKING"],
+              ["PROP_HUMAN_SEAT_CHAIR_TABLE_DRINKING_MOONSHINE"],
+              ["PROP_HUMAN_SEAT_CHAIR_TABLE_DRINKING_WHISKEY_MOONSHINE"],
+              ["PROP_HUMAN_SEAT_CHAIR_TABLE_FAN_WHORE"],
+              ["PROP_HUMAN_PASSED_OUT_TABLE"]
+            ]
+          },
+          "noshow": {}
+        }
+      }
+    },
   {
-    "item": 1360797073,
-    "offsets": [
-      { "x": -0.00079247988936, "y": 0.09728765383737, "z": 0.5, "heading": 0.00000858306884 }
-    ],
-    "poses": {
-      "show": {
-        "Piano": [
-          ["PROP_HUMAN_PIANO"],
-          ["PROP_HUMAN_PIANO_RIVERBOAT"],
-          ["PROP_HUMAN_PIANO_UPPERCLASS"],
-          ["PROP_HUMAN_PIANO_SKETCHY"]
+      "name": "Dual Railing",
+      "offsets": {
+        "Group 1": [
+          { "x": -0.56091430664062, "y": 0.59035644531249, "z": -1.49427307128906, "heading": 288.5687561035156 },
+          { "x": -0.06091430664062, "y": -0.7096435546875, "z": -1.49427307128906, "heading": 288.5687561035156 }
         ]
       },
-      "noshow": {}
+      "poses": {
+        "Group 1": {
+          "show": {
+            "Lean": [
+              ["WORLD_HUMAN_LEAN_RAILING"],
+              ["WORLD_HUMAN_LEAN_RAILING_DRINKING"],
+              ["WORLD_HUMAN_LEAN_RAILING_SMOKING"]
+            ]
+          },
+          "noshow": {}
+        }
+      }
+    },
+  {
+      "name": "lean Pole",
+      "offsets": {
+        "Left": [
+          { "x": 0.3687807122463, "y": -0.03237991208717, "z": -0.83630981445312, "heading": 350.9541798233986 }
+        ],
+        "Right": [
+          { "x": -0.34121928775369, "y": -0.08237991208716, "z": -0.83630981445312, "heading": 12.95417982339859 }
+        ]
+      },
+      "poses": {
+        "Left": {
+          "show": {
+            "Lean": [
+              ["WORLD_HUMAN_LEAN_POST_LEFT"]
+            ]
+          },
+          "noshow": {}
+        },
+        "Right": {
+          "show": {
+            "Lean": [
+              ["WORLD_HUMAN_LEAN_POST_RIGHT"]
+            ]
+          },
+          "noshow": {}
+        }
+      }
+    },
+  {
+      "name": "Piano",
+      "offsets": {
+        "Group 1": [
+          { "x": -0.00079247988936, "y": 0.09728765383737, "z": 0.5, "heading": 0.00000858306884 }
+        ]
+      },
+      "poses": {
+        "Group 1": {
+          "show": {
+            "Piano": [
+              ["PROP_HUMAN_PIANO"],
+              ["PROP_HUMAN_PIANO_RIVERBOAT"],
+              ["PROP_HUMAN_PIANO_SKETCHY"],
+              ["PROP_HUMAN_PIANO_UPPERCLASS"],
+              ["PROP_HUMAN_ABIGAIL_PIANO"]
+            ]
+          },
+          "noshow": {}
+        }
+      }
     }
+  ],
+  "items": {
+    "-1443906703": "Chair",
+    "-1523527069": "Bench",
+    "-1728858449": "Bar",
+    "-1955616981": ["lean Pole",{"y":0,"x":0,"heading":0.0,"z":2.064}],
+    "-2062900430": "Bench",
+    "-551054210": "Bench",
+    "-779184822": "lean Pole",
+    "-847228074": "Bed Single",
+    "1057555344": "Bench",
+    "1183007103": "Dual Railing",
+    "1229219138": "Bench",
+    "129713023": ["Bar",{"y":0,"x":0,"heading":0.0,"z":0.42}],
+    "1360797073": "Piano",
+    "325252933": "Chair"
   }
-]
+}

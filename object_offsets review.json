@@ -1,36 +1,228 @@
-[
+{
+  "presets": [
   {
-    "item": 1057555344,
-    "offsets": [
-      { "x": -0.48548419347929, "y": -0.01733962201217, "z": 0.5, "heading": 183.0000295639038 },
-      { "x": 0.59756018841339, "y": 0.03064250706442, "z": 0.5, "heading": 179.99999904632569 },
-      { "x": 0.025, "y": -0.135, "z": 0.5, "heading": 270.0 }
-    ],
-    "poses": {
-      "show": {
-        "Seat Bench": [
-          ["PROP_HUMAN_SEAT_BENCH_FIDDLE"]
+      "name": "Bench2",
+      "offsets": {
+        "Group 1": [
+          { "x": 0.05, "y": -0.135, "z": 0.5, "heading": 270.0 },
+          { "x": -0.48548419347929, "y": -0.01733962201217, "z": 0.5, "heading": 183.0000295639038 },
+          { "x": -0.0024398115866, "y": 0.09064250706442, "z": 0.5, "heading": 179.99999904632569 },
+          { "x": 0.59756018841339, "y": 0.03064250706442, "z": 0.5, "heading": 179.99999904632569 }
         ]
       },
-      "noshow": {}
-    }
-  },
+      "poses": {
+        "Group 1": {
+          "show": {
+            "Seat Bench": [
+              ["PROP_HUMAN_SEAT_BENCH_CONCERTINA"],
+              ["PROP_HUMAN_SEAT_BENCH_TIRED"],
+              ["PROP_HUMAN_SEAT_BENCH_PORCH_DRINKING_MOONSHINE"],
+              ["PROP_HUMAN_SEAT_BENCH_CONCERTINA_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_MANDOLIN_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_MANDOLIN_UPBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH"]
+            ],
+            "Seat Chair": [
+              ["PROP_HUMAN_SEAT_CHAIR"],
+              ["PROP_HUMAN_SEAT_CHAIR_BANJO"],
+              ["PROP_HUMAN_SEAT_CHAIR_BANJO_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_CHAIR_BANJO_UPBEAT"],
+              ["PROP_HUMAN_SEAT_CHAIR_READING"],
+              ["PROP_HUMAN_SEAT_CHAIR_READ_NEWSPAPER"],
+              ["PROP_HUMAN_SEAT_CHAIR_SHARPEN_AXE"],
+              ["PROP_HUMAN_SEAT_CHAIR_SKETCHING"],
+              ["PROP_HUMAN_SEAT_CHAIR_SMOKE_ROLL"],
+              ["PROP_HUMAN_SEAT_CHAIR_SMOKING"],
+              ["PROP_HUMAN_SEAT_CHAIR_WHITTLE"],
+              ["SC_PROP_CAMP_DUTCH_SEAT_CHAIR_READING"]
+            ],
+            "Sleep Bed Pillow": [
+              ["PROP_HUMAN_SLEEP_BED_PILLOW"]
+            ]
+          },
+          "noshow": {
+            "Seat Bench": [
+              ["PROP_HUMAN_SEAT_BENCH_JAW_HARP"]
+            ]
+          }
+        }
+      }
+    },
   {
-    "item": 1229219138,
-    "offsets": [
-      { "x": 0.45858014446913, "y": 0.04788749017986, "z": 0.50067138671875, "heading": 180.00000190734864 },
-      { "x": -0.4239563352384, "y": 0.04791048855256, "z": 0.4991226196289, "heading": 180.00000190734864 }
-    ],
-    "poses": {
-      "show": {
-        "Seat Bench": [
-          ["PROP_HUMAN_SEAT_BENCH_FIDDLE_UPBEAT"],
-          ["PROP_HUMAN_SEAT_BENCH_MANDOLIN"],
-          ["PROP_HUMAN_SEAT_BENCH_MANDOLIN_DOWNBEAT"],
-          ["PROP_HUMAN_SEAT_BENCH_MANDOLIN_UPBEAT"]
+      "name": "Item -847228074",
+      "offsets": {
+        "Group 1": [
+          { "x": 0.0, "y": -0.35, "z": 0.5, "heading": 180.0 }
         ]
       },
-      "noshow": {}
+      "poses": {
+        "Group 1": {
+          "show": {
+            "Sleep Bed Pillow": [
+              ["PROP_HUMAN_SLEEP_BED_PILLOW"],
+              ["PROP_HUMAN_SLEEP_BED_PILLOW_RIGHT"]
+            ]
+          },
+          "noshow": {}
+        }
+      }
+    },
+  {
+      "name": "Item 1057555344",
+      "offsets": {
+        "Laydown": [
+          { "x": 0.05, "y": -0.135, "z": 0.5, "heading": 270.0 }
+        ],
+        "Sit": [
+          { "x": -0.48548419347929, "y": -0.01733962201217, "z": 0.5, "heading": 183.0000295639038 },
+          { "x": -0.0024398115866, "y": 0.09064250706442, "z": 0.5, "heading": 179.99999904632569 },
+          { "x": 0.59756018841339, "y": 0.03064250706442, "z": 0.5, "heading": 179.99999904632569 }
+        ]
+      },
+      "poses": {
+        "Laydown": {
+          "show": {
+            "Sleep Bed Pillow": [
+              ["PROP_HUMAN_SLEEP_BED_PILLOW"]
+            ]
+          },
+          "noshow": {}
+        },
+        "Sit": {
+          "show": {
+            "Seat Bench": [
+              ["PROP_HUMAN_SEAT_BENCH_CONCERTINA"],
+              ["PROP_HUMAN_SEAT_BENCH_TIRED"],
+              ["PROP_HUMAN_SEAT_BENCH_PORCH_DRINKING_MOONSHINE"],
+              ["PROP_HUMAN_SEAT_BENCH_CONCERTINA_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_CONCERTINA_UPBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_PORCH"],
+              ["PROP_HUMAN_SEAT_BENCH_FIDDLE"],
+              ["PROP_HUMAN_SEAT_BENCH_FIDDLE_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_FIDDLE_UPBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_HARMONICA"],
+              ["PROP_HUMAN_SEAT_BENCH_HARMONICA_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_HARMONICA_UPBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_JAW_HARP_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_JAW_HARP_UPBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_MANDOLIN"],
+              ["PROP_HUMAN_SEAT_BENCH_MANDOLIN_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_MANDOLIN_UPBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH"]
+            ],
+            "Seat Chair": [
+              ["PROP_HUMAN_SEAT_CHAIR"],
+              ["PROP_HUMAN_SEAT_CHAIR_BANJO"],
+              ["PROP_HUMAN_SEAT_CHAIR_BANJO_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_CHAIR_BANJO_UPBEAT"],
+              ["PROP_HUMAN_SEAT_CHAIR_CIGAR"],
+              ["PROP_HUMAN_SEAT_CHAIR_DRINKING_MOONSHINE"],
+              ["PROP_HUMAN_SEAT_CHAIR_FAN"],
+              ["PROP_HUMAN_SEAT_CHAIR_FISHING_ROD"],
+              ["PROP_HUMAN_SEAT_CHAIR_GUITAR"],
+              ["PROP_HUMAN_SEAT_CHAIR_KNIFE_BADASS"],
+              ["PROP_HUMAN_SEAT_CHAIR_KNITTING"],
+              ["PROP_HUMAN_SEAT_CHAIR_READING"],
+              ["PROP_HUMAN_SEAT_CHAIR_READ_NEWSPAPER"],
+              ["PROP_HUMAN_SEAT_CHAIR_SEWING"],
+              ["PROP_HUMAN_SEAT_CHAIR_SHARPEN_AXE"],
+              ["PROP_HUMAN_SEAT_CHAIR_SKETCHING"],
+              ["PROP_HUMAN_SEAT_CHAIR_SMOKE_ROLL"],
+              ["PROP_HUMAN_SEAT_CHAIR_SMOKING"],
+              ["PROP_HUMAN_SEAT_CHAIR_WHITTLE"],
+              ["SC_PROP_CAMP_DUTCH_SEAT_CHAIR_READING"]
+            ]
+          },
+          "noshow": {
+            "Seat Bench": [
+              ["PROP_HUMAN_SEAT_BENCH_JAW_HARP"]
+            ]
+          }
+        }
+      }
+    },
+  {
+      "name": "Item 1229219138",
+      "offsets": {
+        "Group 1": [
+          { "x": 0.45858014446913, "y": 0.04788749017986, "z": 0.50067138671875, "heading": 180.00000190734864 },
+          { "x": -0.4239563352384, "y": 0.04791048855256, "z": 0.4991226196289, "heading": 180.00000190734864 }
+        ]
+      },
+      "poses": {
+        "Group 1": {
+          "show": {
+            "Seat Bench": [
+              ["PROP_HUMAN_SEAT_BENCH"],
+              ["PROP_HUMAN_SEAT_BENCH_CONCERTINA"],
+              ["PROP_HUMAN_SEAT_BENCH_CONCERTINA_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_CONCERTINA_UPBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_FIDDLE"],
+              ["PROP_HUMAN_SEAT_BENCH_FIDDLE_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_PORCH"],
+              ["PROP_HUMAN_SEAT_BENCH_PORCH_DRINKING_MOONSHINE"],
+              ["PROP_HUMAN_SEAT_BENCH_TIRED"],
+              ["PROP_HUMAN_SEAT_BENCH_HARMONICA"],
+              ["PROP_HUMAN_SEAT_BENCH_HARMONICA_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_HARMONICA_UPBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_JAW_HARP"],
+              ["PROP_HUMAN_SEAT_BENCH_JAW_HARP_DOWNBEAT"],
+              ["PROP_HUMAN_SEAT_BENCH_JAW_HARP_UPBEAT"]
+            ]
+          },
+          "noshow": {}
+        }
+      }
+    },
+  {
+      "name": "Item 1360797073",
+      "offsets": {
+        "Group 1": [
+          { "x": -0.00079247988936, "y": 0.09728765383737, "z": 0.5, "heading": 0.00000858306884 }
+        ]
+      },
+      "poses": {
+        "Group 1": {
+          "show": {
+            "Piano": [
+              ["PROP_HUMAN_PIANO"],
+              ["PROP_HUMAN_PIANO_RIVERBOAT"],
+              ["PROP_HUMAN_PIANO_UPPERCLASS"],
+              ["PROP_HUMAN_PIANO_SKETCHY"]
+            ]
+          },
+          "noshow": {}
+        }
+      }
+    },
+  {
+      "name": "Item 325252933",
+      "offsets": {
+        "Group 1": [
+          { "x": 0.025, "y": 0.05, "z": 0.5, "heading": 179.99996948242188 },
+          { "x": -0.05, "y": 0.05, "z": 0.5, "heading": 179.99996948242188 }
+        ]
+      },
+      "poses": {
+        "Group 1": {
+          "show": {
+            "Sit at Table": [
+              ["PROP_HUMAN_PASSED_OUT_TABLE"],
+              ["PROP_HUMAN_SEAT_CHAIR_TABLE_DRINKING_MOONSHINE"],
+              ["PROP_HUMAN_SEAT_CHAIR_TABLE_DRINKING_WHISKEY_MOONSHINE"],
+              ["PROP_HUMAN_SEAT_CHAIR_TABLE_DRINKING"]
+            ]
+          },
+          "noshow": {}
+        }
+      }
     }
+  ],
+  "items": {
+    "-847228074": "Item -847228074",
+    "1057555344": "Bench2",
+    "1229219138": "Item 1229219138",
+    "1360797073": "Item 1360797073",
+    "325252933": "Item 325252933"
   }
-]
+}

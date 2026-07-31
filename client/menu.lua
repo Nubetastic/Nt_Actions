@@ -11,11 +11,7 @@ end
 
 local function handleOpenPress()
     if inPose ~= true then return end
-    if not cachedPoseObject or not DoesEntityExist(cachedPoseObject) then
-        inPose = false
-        cachedPoseObject = nil
-        return
-    end
+    if not cachedPoseObject or not DoesEntityExist(cachedPoseObject) then return end
     if GetGameTimer() < poseMenuBlockedUntil then return end
     if NtMenu.isOpen() then
         NtMenu.hide(true)

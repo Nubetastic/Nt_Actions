@@ -12,6 +12,8 @@
             <aside id="nav-coordinates" class="nav-coordinates menu-surface">
                 <div class="coord-title">Points</div>
                 <div id="nav-coordinate-list" class="nav-coordinate-list"></div>
+                    <button id="nav-group-edit" class="nav-group-edit" type="button">Group Edit</button>
+                    <button id="nav-preset" class="nav-group-edit" type="button">Presets</button>
             </aside>
             <div class="nav-panel menu-surface">
             <header class="nav-header">
@@ -41,7 +43,54 @@
             </div>
         </div>
     </aside>
-    <main id="fine-tune" aria-hidden="true">
+    <section id="group-editor" class="group-editor" aria-hidden="true">
+        <div class="group-editor-panel menu-surface">
+            <header class="group-editor-header">
+                <div>
+                    <h1>Point Group Editor</h1>
+                    <p>Every pose in a group works at every point in that group.</p>
+                </div>
+                <div class="group-editor-actions">
+                    <button id="group-editor-new" type="button">New Group</button>
+                    <button id="group-editor-cancel" type="button" class="secondary">Cancel</button>
+                    <button id="group-editor-save" type="button" class="confirm">Save Groups</button>
+                </div>
+            </header>
+            <div id="group-editor-error" class="group-editor-error" aria-live="polite"></div>
+            <div id="group-editor-groups" class="group-editor-groups"></div>
+        </div>
+    </section>
+    <section id="preset-editor" class="preset-editor" aria-hidden="true">
+        <div class="preset-editor-panel menu-surface">
+            <header class="group-editor-header">
+                <div><h1>Object Presets</h1><p>Apply a shared preset or rename the selected preset.</p></div>
+                <div class="group-editor-actions"><button id="preset-close" type="button">Close</button></div>
+            </header>
+            <div id="preset-error" class="group-editor-error" aria-live="polite"></div>
+            <div class="preset-layout">
+                <aside class="preset-sidebar">
+                    <div class="preset-save-row"><input id="preset-name" maxlength="64" placeholder="Preset name"><button id="preset-rename" type="button">Rename Selected</button></div>
+                    <div id="preset-list" class="preset-list"></div>
+                </aside>
+                <section class="preset-review">
+                    <header class="preset-review-header"><div><h2 id="preset-title">Select a preset</h2><div id="preset-summary"></div></div><button id="preset-apply" type="button" disabled>Apply to Object</button></header>
+                    <div class="preset-point-row"><label for="preset-point">Preview point</label><select id="preset-point"></select></div>
+                    <div id="preset-poses" class="preset-poses"></div>
+                </section>
+            </div>
+        </div>
+    </section>
+    <section id="preset-compare" class="preset-compare" aria-hidden="true">
+        <div class="preset-compare-panel menu-surface">
+            <header class="preset-compare-header"><div><h1>Compare Presets</h1><select id="compare-existing"></select></div><button id="compare-review" type="button">Review</button></header>
+            <div id="compare-error" class="group-editor-error"></div>
+            <div class="compare-columns">
+                <section><h2 id="compare-left-title">Existing Preset</h2><div id="compare-left" class="compare-list"></div></section>
+                <section><h2 id="compare-right-title">New Preset</h2><div id="compare-right" class="compare-list"></div></section>
+            </div>
+            <footer class="preset-compare-footer"><div id="compare-summary"></div><button id="compare-cancel" type="button">Cancel</button><button id="compare-apply" type="button">Apply</button></footer>
+        </div>
+    </section>    <main id="fine-tune" aria-hidden="true">
         <div class="panel menu-surface">
             <aside class="editor-coords">
                 <div class="coord-title">Points</div>
@@ -49,6 +98,21 @@
             </aside>
             <div class="editor-main">
             <div id="editor-title" class="title">Fine tune position</div>
+            <section id="manual-offset-fields" class="manual-offset-fields hidden">
+                <div class="live-coordinates">
+                    <div><span>Player</span><code id="player-coordinates">0.000, 0.000, 0.000</code></div>
+                    <div><span>Object</span><code id="object-coordinates">0.000, 0.000, 0.000</code></div>
+                </div>
+                <div class="offset-inputs">
+                    <label>X <input id="offset-x" type="number" step="0.001"></label>
+                    <label>Y <input id="offset-y" type="number" step="0.001"></label>
+                    <label>Z <input id="offset-z" type="number" step="0.001"></label>
+                    <label>Heading <input id="offset-heading" type="number" step="0.1"></label>
+                </div>
+                <button id="move-set" type="button">Move Set</button>
+                <div id="manual-offset-error" aria-live="polite"></div>
+            </section>
+            <div id="movement-controls" class="movement-controls">
             <div class="control-row">
                 <section class="control-group">
                     <div class="control-label">Position</div>
@@ -85,6 +149,7 @@
                 <output id="camera-zoom-value">3.00 m</output>
             </div>
             <div class="camera-hint">Hold right mouse button to orbit the camera around the player</div>
+            </div>
             <div id="separate-point-option" class="editor-options hidden">
                 <label class="save"><input id="separate-point" type="checkbox"> Add as new point</label>
             </div>

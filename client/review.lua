@@ -12,6 +12,7 @@ local cameraYaw = 0.0
 local cameraPitch = 0.15
 local cameraLookActive = false
 local reviewActive = false
+local presetStates = {}
 
 local function notify(description, notificationType)
     lib.notify({ title = 'Upload Review', description = description, type = notificationType or 'inform' })
@@ -105,7 +106,7 @@ end
 local function endReview(closeMenu)
     cleanupPreview(true)
     reviewActive = false
-    pages, checked, pageIndex, reviewOrigin = {}, {}, 1, nil
+    pages, checked, presetStates, pageIndex, reviewOrigin = {}, {}, {}, 1, nil
     lib.callback.await('nt_actions:server:endReview', false)
     if closeMenu then NtMenu.hide(false) end
 end
@@ -142,7 +143,7 @@ local function previewPose(pose, offset)
     if not ok then notify('That pose could not be previewed.', 'error') end
 end
 
-local openPage
+local openPresetPage
 
 local function pageState(page)
     checked[page.key] = checked[page.key] or { poses = {}, coords = {}, selectedCoordinate = 1 }
@@ -170,143 +171,6 @@ local function genderLabel(gender)
     return gender == 'male' and 'Male' or gender == 'female' and 'Female' or nil
 end
 
-local function submitPage()
-    local page = pages[pageIndex]
-    if not page then return end
-    local state = pageState(page)
-    local approvedPoses, approvedCoords = {}, {}
-    for id, value in pairs(state.poses) do if value == true then approvedPoses[#approvedPoses + 1] = id end end
-    for id, value in pairs(state.coords) do if value == true then approvedCoords[#approvedCoords + 1] = id end end
-    cleanupPreview(true)
-    local result = lib.callback.await(
-        'nt_actions:server:submitReviewGroup', false,
-        page.key, approvedPoses, approvedCoords, reviewerGender())
-    if type(result) ~= 'table' then
-        notify('The review item could not be saved.', 'error')
-        openPage()
-        return
-    end
-    notify(('%d/%d poses and %d/%d points approved.'):format(
-        result.posesMerged or 0,
-        result.posesProcessed or 0,
-        result.coordsMerged or 0,
-        result.coordsProcessed or 0
-    ), 'success')
-    if result.waitingForGender then
-        notify(('Poses remain for review with a %s ped.'):format(result.waitingForGender), 'inform')
-    end
-    pages = result.pages or {}
-    checked[page.key] = nil
-    if #pages == 0 then
-        endReview(true)
-        notify('Batch review is complete.', 'success')
-        return
-    end
-    pageIndex = math.max(1, math.min(pageIndex, #pages))
-    openPage()
-end
-
-local function approvePage()
-    local page = pages[pageIndex]
-    if not page then return end
-    local state = pageState(page)
-
-    local waitingGender
-    for _, pose in ipairs(page.poses or {}) do
-        if not poseCompatible(pose) then waitingGender = waitingGender or pose.gender end
-    end
-    local confirmationOptions = {
-        {
-            label = waitingGender
-                and 'Warning: Unchecked compatible poses are removed; other-gender poses and pending points remain.'
-                or 'Warning: Confirm decisions; unchecked poses and new coordinates will be removed.',
-            disabled = true,
-            tone = 'danger',
-        },
-        { label = 'Poses to be processed', disabled = true, section = true, gapBefore = true },
-    }
-    local firstPose = true
-    for _, pose in ipairs(page.poses or {}) do
-        if not pose.current and poseCompatible(pose) then
-            local approved = state.poses[pose.id] == true
-            confirmationOptions[#confirmationOptions + 1] = {
-                label = NtActionsClient.poseLabel(pose.group, pose.scenario),
-                description = approved and 'Will be approved' or 'Will be removed',
-                disabled = true,
-                tone = approved and 'success' or 'danger',
-                gapBefore = firstPose,
-            }
-            firstPose = false
-        end
-    end
-    if firstPose then
-        confirmationOptions[#confirmationOptions + 1] = {
-            label = 'No new poses', disabled = true, gapBefore = true,
-        }
-    end
-
-    if waitingGender then
-        confirmationOptions[#confirmationOptions + 1] = {
-            label = 'Poses waiting for another gender', disabled = true, section = true, gapBefore = true,
-        }
-        for _, pose in ipairs(page.poses or {}) do
-            if not poseCompatible(pose) then
-                confirmationOptions[#confirmationOptions + 1] = {
-                    label = NtActionsClient.poseLabel(pose.group, pose.scenario),
-                    description = ('Preserved for a %s ped'):format(pose.gender),
-                    rightLabel = genderLabel(pose.gender),
-                    disabled = true,
-                }
-            end
-        end
-    end
-
-    confirmationOptions[#confirmationOptions + 1] = {
-        label = 'New coordinates to be processed', disabled = true, section = true, gapBefore = true,
-    }
-    if #(page.newCoords or {}) == 0 then
-        confirmationOptions[#confirmationOptions + 1] = {
-            label = 'No new coordinates', disabled = true, gapBefore = true,
-        }
-    else
-        for index, coord in ipairs(page.newCoords) do
-            local approved = state.coords[coord.id] == true
-            confirmationOptions[#confirmationOptions + 1] = {
-                label = ('New point N%d'):format(index),
-                description = (approved and 'Will be approved - '
-                    or waitingGender and 'Will remain pending - '
-                    or 'Will be removed - ')
-                    .. coordDescription(coord.offset),
-                disabled = true,
-                tone = approved and 'success' or not waitingGender and 'danger' or nil,
-                gapBefore = index == 1,
-            }
-        end
-    end
-
-    NtMenu.open(
-        'Confirm Approval',
-        confirmationOptions,
-        nil,
-        function() endReview(false) end,
-        {
-            footerActions = {
-                { label = 'Approve', args = { action = 'approve' } },
-                { label = 'Back', args = { action = 'back' } },
-            },
-            hideBack = true,
-            onFooter = function(_, args)
-                if args.action == 'approve' then
-                    NtMenu.hide(false)
-                    submitPage()
-                elseif args.action == 'back' then
-                    NtMenu.back()
-                end
-            end,
-        }
-    )
-end
-
 local function beginCameraLook()
     if not reviewActive or cameraLookActive or not reviewCamera then return end
     cameraLookActive = true
@@ -332,73 +196,81 @@ local function beginCameraLook()
     end)
 end
 
-openPage = function()
+local function presetPageState(page)
+    presetStates[page.key] = presetStates[page.key] or {
+        objectIndex = 1,
+        existingPreset = '',
+        replacePreset = false,
+        checkedPoses = {},
+        checkedObjects = {},
+        compareOpen = false,
+    }
+    return presetStates[page.key]
+end
+
+openPresetPage = function()
     local page = pages[pageIndex]
     if not page then endReview(true) return end
+    local state = presetPageState(page)
+    state.objectIndex = math.max(1, math.min(#(page.objects or {}), tonumber(state.objectIndex) or 1))
+    local displayedObject = page.objects[state.objectIndex]
+    local definition = page.candidateDefinition or { currentCoords = {}, poses = {} }
+
     NtMenu.hide(false)
-    if not spawnReviewObject(page.item) then
-        notify(('Model %s could not be spawned.'):format(page.item), 'error')
+    if displayedObject and not spawnReviewObject(displayedObject.item) then
+        notify(('Model %s could not be spawned.'):format(displayedObject.item), 'error')
+    elseif not displayedObject then
+        cleanupPreview(true)
     end
-    local state = pageState(page)
+
     local options = {}
-    for _, pose in ipairs(page.poses or {}) do
-        if not pose.current then
-            local compatible = poseCompatible(pose)
-            options[#options + 1] = {
-                label = NtActionsClient.poseLabel(pose.group, pose.scenario),
-                rightLabel = not compatible and genderLabel(pose.gender) or nil,
-                description = not compatible and (pose.group .. ' - Requires a ' .. pose.gender .. ' ped')
-                    or pose.group,
-                disabled = not compatible,
-                checkable = compatible,
-                checked = compatible and state.poses[pose.id] == true,
-                args = compatible and { pose = pose } or nil,
-            }
-        end
+    for _, pose in ipairs(definition.poses or {}) do
+        local compatible = poseCompatible(pose)
+        options[#options + 1] = {
+            label = NtActionsClient.poseLabel(pose.group, pose.scenario),
+            rightLabel = not compatible and genderLabel(pose.gender) or pose.visibility == 'noshow' and 'Hidden' or nil,
+            description = ('%s - %s'):format(pose.group, pose.pointGroup or 'Group 1'),
+            disabled = not compatible or pose.visibility == 'noshow',
+            args = compatible and pose.visibility ~= 'noshow' and { pose = pose } or nil,
+        }
     end
     local coordinateOptions = {}
-    for index, offset in ipairs(page.currentCoords or {}) do
+    local groupCounts = {}
+    for _, point in ipairs(definition.currentCoords or {}) do
+        local pointGroup = point.pointGroup or 'Group 1'
+        groupCounts[pointGroup] = (groupCounts[pointGroup] or 0) + 1
         coordinateOptions[#coordinateOptions + 1] = {
-            label = tostring(index),
-            title = ('Current point %d - %s'):format(index, coordDescription(offset)),
-            args = { offset = offset, current = true },
+            label = tostring(groupCounts[pointGroup]), pointGroup = pointGroup,
+            title = ('%s point %d - %s'):format(pointGroup, groupCounts[pointGroup], coordDescription(point.offset)),
+            args = { offset = point.offset },
         }
     end
-    for index, coord in ipairs(page.newCoords or {}) do
-        coordinateOptions[#coordinateOptions + 1] = {
-            label = ('N%d'):format(index),
-            title = ('New point N%d - %s'):format(index, coordDescription(coord.offset)),
-            checkable = true,
-            checked = state.coords[coord.id] == true,
-            args = { id = coord.id, offset = coord.offset },
-        }
-    end
-    state.selectedCoordinate = math.max(1, math.min(
-        #coordinateOptions,
-        tonumber(state.selectedCoordinate) or 1
-    ))
+    local normalState = pageState(page)
+    normalState.selectedCoordinate = math.max(1, math.min(#coordinateOptions, tonumber(normalState.selectedCoordinate) or 1))
+
     local footer = {
-        { label = 'Back', disabled = pageIndex <= 1, args = { action = 'back' } },
-        { label = 'Next', disabled = pageIndex >= #pages, args = { action = 'next' } },
-        { label = 'Approve', args = { action = 'approve' } },
+        { label = 'Back Preset', disabled = pageIndex <= 1, args = { action = 'back' } },
+        { label = 'Next Preset', disabled = pageIndex >= #pages, args = { action = 'next' } },
+        { label = 'Previous Object', disabled = #(page.objects or {}) < 2, args = { action = 'previousObject' } },
+        { label = 'Next Object', disabled = #(page.objects or {}) < 2, args = { action = 'nextObject' } },
+        { label = 'Compare', args = { action = 'compare' } },
     }
-    NtMenu.open(
-        ('Review %d/%d - Object %s'):format(pageIndex, #pages, page.item),
-        options,
+    NtMenu.open(('Preset Review %d/%d - %s'):format(pageIndex, #pages, page.candidateName), options,
         function(_, args)
-            local coordinate = coordinateOptions[state.selectedCoordinate]
+            local coordinate = coordinateOptions[normalState.selectedCoordinate]
             previewPose(args.pose, coordinate and coordinate.args.offset or nil)
         end,
         function() endReview(false) end,
         {
             footerActions = footer,
             coordinateOptions = coordinateOptions,
-            selectedCoordinate = state.selectedCoordinate,
-            showReviewCamera = true,
+            selectedCoordinate = normalState.selectedCoordinate,
+            showReviewCamera = displayedObject ~= nil,
             reviewCameraDistance = cameraRadius,
             reviewCameraMin = tonumber(settings.CameraZoomMin) or 0.75,
             reviewCameraMax = tonumber(settings.CameraZoomMax) or 8.0,
             reviewCameraStep = tonumber(settings.CameraZoomStep) or 0.25,
+            onCoordinateSelect = function(index) normalState.selectedCoordinate = index end,
             onReviewZoom = function(distance)
                 local minimum = tonumber(settings.CameraZoomMin) or 0.75
                 local maximum = tonumber(settings.CameraZoomMax) or 8.0
@@ -406,71 +278,100 @@ openPage = function()
                 positionCamera()
             end,
             onCameraLook = beginCameraLook,
-            onCheck = function(_, args, value)
-                if not args.pose.current then state.poses[args.pose.id] = value == true end
-            end,
-            onCoordinateSelect = function(index)
-                state.selectedCoordinate = index
-            end,
-            onCoordinateCheck = function(_, args, value)
-                state.coords[args.id] = value == true
-            end,
             onFooter = function(_, args)
-                if args.action == 'back' then
-                    pageIndex = pageIndex - 1
-                    openPage()
-                elseif args.action == 'next' then
-                    pageIndex = pageIndex + 1
-                    openPage()
-                elseif args.action == 'approve' then
-                    approvePage()
+                if args.action == 'back' then pageIndex = pageIndex - 1; openPresetPage()
+                elseif args.action == 'next' then pageIndex = pageIndex + 1; openPresetPage()
+                elseif args.action == 'previousObject' and #page.objects > 0 then
+                    state.objectIndex = ((state.objectIndex - 2) % #page.objects) + 1
+                    openPresetPage()
+                elseif args.action == 'nextObject' and #page.objects > 0 then
+                    state.objectIndex = (state.objectIndex % #page.objects) + 1
+                    openPresetPage()
+                elseif args.action == 'compare' then
+                    cleanupPreview(false)
+                    NtMenu.hide(false)
+                    state.compareOpen = true
+                    SetNuiFocus(true, true)
+                    SendNUIMessage({ action = 'presetCompareOpen', page = page, draft = state })
                 end
             end,
-        }
-    )
+        })
 end
+RegisterNUICallback('presetCompareReview', function(data, cb)
+    local page = pages[pageIndex]
+    if not page then cb({ ok = false }) return end
+    local state = presetPageState(page)
+    if type(data.draft) == 'table' then
+        state.existingPreset = type(data.draft.existingPreset) == 'string' and data.draft.existingPreset or state.existingPreset
+        state.replacePreset = data.draft.replacePreset == true
+        state.checkedPoses = type(data.draft.checkedPoses) == 'table' and data.draft.checkedPoses or state.checkedPoses
+        state.checkedObjects = type(data.draft.checkedObjects) == 'table' and data.draft.checkedObjects or state.checkedObjects
+    end
+    state.compareOpen = false
+    SetNuiFocus(false, false)
+    SendNUIMessage({ action = 'presetCompareClose' })
+    openPresetPage()
+    cb({ ok = true })
+end)
 
+RegisterNUICallback('presetCompareApply', function(data, cb)
+    local page = pages[pageIndex]
+    if not page then cb({ ok = false }) return end
+    local existingName = type(data.existingPreset) == 'string' and data.existingPreset or nil
+    local result = lib.callback.await('nt_actions:server:submitPresetCompare', false,
+        page.candidateName, existingName, data.replacePreset == true,
+        type(data.checkedPoses) == 'table' and data.checkedPoses or {},
+        type(data.checkedObjects) == 'table' and data.checkedObjects or {})
+    if type(result) ~= 'table' then cb({ ok = false, error = 'The comparison could not be applied.' }) return end
+    pages = result.pages or {}
+    presetStates[page.key] = nil
+    SetNuiFocus(false, false)
+    SendNUIMessage({ action = 'presetCompareClose' })
+    cb({ ok = true })
+    if #pages == 0 then endReview(true); notify('Preset review is complete.', 'success') return end
+    pageIndex = math.max(1, math.min(pageIndex, #pages))
+    openPresetPage()
+end)
 local function openReviewEntry()
     local status = lib.callback.await('nt_actions:server:reviewStatus', false) or {}
     if not status.authorized then notify('You do not have review permission.', 'error') return end
     local options = {
         {
-            label = 'Cleanup Review Data',
-            description = ('%d items / %d poses / %d points'):format(
-                status.items or 0, status.poses or 0, status.coords or 0),
+            label = 'Cleanup Preset Review Data',
+            description = ('%d presets / %d items'):format(status.presets or 0, status.items or 0),
             disabled = status.busy == true or not status.hasData,
             args = { action = 'cleanup' },
         },
         {
-            label = 'Start Review',
-            description = status.clean and 'Review data is clean and ready.' or 'Cleanup must run first.',
+            label = 'Start Preset Review',
+            description = status.clean and 'Preset review data is clean and ready.' or 'Cleanup must run first.',
             disabled = not status.clean or status.busy,
             args = { action = 'start' },
         },
     }
-    NtMenu.open('Upload Review', options, function(_, args)
+    NtMenu.open('Preset Upload Review', options, function(_, args)
         if args.action == 'cleanup' then
             local result = lib.callback.await('nt_actions:server:cleanupReview', false)
-            if type(result) ~= 'table' then notify('Review cleanup failed.', 'error') return end
-            notify(('%d records removed; %d remain.'):format(result.removed or 0, result.poses or 0), 'success')
+            if type(result) ~= 'table' then notify('Preset review cleanup failed.', 'error') return end
+            notify(('%d invalid records removed; %d presets and %d items remain.'):format(
+                result.removed or 0, result.presets or 0, result.items or 0), 'success')
             NtMenu.hide(false)
             openReviewEntry()
         elseif args.action == 'start' then
-            local result = lib.callback.await('nt_actions:server:startReview', false)
+            local result = lib.callback.await('nt_actions:server:startPresetReview', false)
             if type(result) ~= 'table' or result.busy or result.needsCleanup then
                 notify(result and result.busy and 'Another admin is reviewing this batch.' or 'Cleanup must run first.', 'error')
                 return
             end
             pages = result.pages or {}
-            if #pages == 0 then notify('There are no poses left to review.', 'inform') return end
+            if #pages == 0 then notify('There are no presets left to review.', 'inform') return end
             reviewOrigin = pedTransform()
             reviewActive = true
-            pageIndex, checked = 1, {}
-            openPage()
+            pageIndex, checked, presetStates = 1, {}, {}
+            openPresetPage()
         end
     end)
 end
-
 function NtReview.open()
     openReviewEntry()
 end

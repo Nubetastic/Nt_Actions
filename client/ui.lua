@@ -46,6 +46,7 @@ local function sendMenu(preserveScroll)
             label = action.label or ('Action ' .. index),
             disabled = action.disabled == true or not action.args,
             danger = action.danger == true,
+            wide = action.wide == true,
         }
     end
     local coordinates = {}
@@ -58,6 +59,7 @@ local function sendMenu(preserveScroll)
                 deletable = option.deletable == true,
                 checkable = option.checkable == true,
                 checked = option.checked == true,
+                pointGroup = option.pointGroup,
             }
         end
     else
@@ -92,6 +94,9 @@ local function sendMenu(preserveScroll)
         reviewCameraStep = currentMenu.reviewCameraStep,
         coordinates = coordinates,
         selectedCoordinate = currentMenu.selectedCoordinate,
+        showGroupEdit = currentMenu.showGroupEdit,
+        showPreset = currentMenu.showPreset,
+        presetLabel = currentMenu.presetLabel,
     })
     TriggerEvent('nt_actions:client:setMenuOpen', true)
 end
@@ -127,6 +132,11 @@ function NtMenu.open(title, options, callback, onClose, settings)
         onCoordinateSelect = settings.onCoordinateSelect,
         onCoordinateDelete = settings.onCoordinateDelete,
         onCoordinateCheck = settings.onCoordinateCheck,
+        showGroupEdit = settings.showGroupEdit == true,
+        onGroupEdit = settings.onGroupEdit,
+        showPreset = settings.showPreset == true,
+        presetLabel = settings.presetLabel,
+        onPreset = settings.onPreset,
     }
     sendMenu()
 end
@@ -161,6 +171,7 @@ function NtMenu.refreshFooter()
             label = action.label or ('Action ' .. index),
             disabled = action.disabled == true or not action.args,
             danger = action.danger == true,
+            wide = action.wide == true,
         }
     end
     SendNUIMessage({ action = 'navFooterUpdate', footerActions = footerActions })
@@ -260,6 +271,21 @@ RegisterNUICallback('navMod', function(_, cb)
     menu.onMod()
 end)
 
+RegisterNUICallback('navGroupEdit', function(_, cb)
+    local menu = currentMenu
+    if not menu or menu.showGroupEdit ~= true or not menu.onGroupEdit then
+        cb({ ok = false })
+        return
+    end
+    cb({ ok = true })
+    menu.onGroupEdit()
+end)
+RegisterNUICallback('navPreset', function(_, cb)
+    local menu = currentMenu
+    if not menu or menu.showPreset ~= true or not menu.onPreset then cb({ ok = false }) return end
+    cb({ ok = true })
+    menu.onPreset()
+end)
 RegisterNUICallback('navCoordinateSelect', function(data, cb)
     local menu = currentMenu
     local coordNumber = tonumber(data.coordNumber)
@@ -293,9 +319,13 @@ end)
 RegisterNUICallback('navCoordinateDelete', function(data, cb)
     local menu = currentMenu
     local coordNumber = tonumber(data.coordNumber)
-    if not menu or menu.coordinatesDeletable ~= true or not coordNumber
-        or not menu.coordinates[coordNumber] or not menu.onCoordinateDelete
-    then
+    local coordinate = menu and coordNumber and (
+        type(menu.coordinateOptions) == 'table' and menu.coordinateOptions[coordNumber]
+            or menu.coordinates[coordNumber]
+    )
+    local deletable = type(coordinate) == 'table' and coordinate.deletable == true
+        or menu and menu.coordinatesDeletable == true
+    if not coordinate or not deletable or not menu.onCoordinateDelete then
         cb({ ok = false })
         return
     end

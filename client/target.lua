@@ -5,20 +5,33 @@ local selectedModel
 local selectedGroup
 local selectedScenario
 local currentOffset
-local currentLibrary = { records = {}, offsets = {} }
+local DEFAULT_POINT_GROUP = 'Group 1'
+local currentLibrary = { records = {}, offsets = {}, pointGroups = {}, pointGroupNames = {} }
+local currentPreset
+local poseOffsets = {}
+local currentObjectOffset
 local canDeleteGroups = false
+local canEditPoseOffsets = false
+local cachedTargetModels = {}
+local canTargetUnregistered = false
 local modModeActive = false
 local activePose
 local editorPreviousPose
 local editorOrigin
 local editorMode
 local editorCoordNumber
+local editorPointOffset
+local editorScenarioInPlace = false
 local availablePointOffsets = {}
 local pointScanSession = 0
 local selectedMenuCoord = 1
 local objectMenuVisible = false
 local fineTuneActive = false
+local editorMoveSetActive = false
 local editorOpening = false
+local groupEditorActive = false
+local presetEditorActive = false
+local presetCache = {}
 local cameraLookActive = false
 local fineTuneCamera
 local orbitRadius = 1.0
@@ -67,6 +80,16 @@ local function notify(description, notificationType)
     })
 end
 
+local function ensurePresetName()
+    if type(currentPreset) == 'string' and currentPreset ~= '' then return currentPreset end
+    local input = lib.inputDialog('Assign Object Preset', {
+        { type = 'input', label = 'Preset name', description = 'Create a new preset or enter an existing preset name.', required = true, min = 1, max = 64 },
+    })
+    local name = input and type(input[1]) == 'string' and input[1]:match('^%s*(.-)%s*$') or nil
+    if not name or name == '' then return nil end
+    currentPreset = name
+    return name
+end
 local function copyOffset(value)
     value = value or ConfigTarget.DefaultOffset or {}
     return {
@@ -77,6 +100,55 @@ local function copyOffset(value)
     }
 end
 
+local function rotatePoseXY(adjustment, pointHeading)
+    local radians = math.rad(tonumber(pointHeading) or 0.0)
+    local cosine, sine = math.cos(radians), math.sin(radians)
+    return
+        (adjustment.x * cosine) - (adjustment.y * sine),
+        (adjustment.x * sine) + (adjustment.y * cosine)
+end
+
+local function combinedOffset(pointOffset, poseOffset)
+    local point = copyOffset(pointOffset)
+    local adjustment = copyOffset(poseOffset or {})
+    local x, y = rotatePoseXY(adjustment, point.heading)
+    return {
+        x = point.x + x,
+        y = point.y + y,
+        z = point.z + adjustment.z,
+        heading = (point.heading + adjustment.heading) % 360.0,
+    }
+end
+
+local function poseOffsetFor(scenarioName)
+    return poseOffsets[scenarioName]
+end
+
+local function withoutPoseOffset(value, scenarioName)
+    local offset = copyOffset(value)
+    local adjustment = poseOffsetFor(scenarioName)
+    if not adjustment then return offset end
+    local pointHeading = (offset.heading - (tonumber(adjustment.heading) or 0.0)) % 360.0
+    local x, y = rotatePoseXY(copyOffset(adjustment), pointHeading)
+    offset.x = offset.x - x
+    offset.y = offset.y - y
+    offset.z = offset.z - (tonumber(adjustment.z) or 0.0)
+    offset.heading = pointHeading
+    return offset
+end
+
+local function withoutObjectOffset(value)
+    local offset = copyOffset(value)
+    if not currentObjectOffset then return offset end
+    local adjustment = copyOffset(currentObjectOffset)
+    local heading = math.rad(-(tonumber(adjustment.heading) or 0.0))
+    local dx, dy = offset.x - adjustment.x, offset.y - adjustment.y
+    offset.x = (dx * math.cos(heading)) - (dy * math.sin(heading))
+    offset.y = (dx * math.sin(heading)) + (dy * math.cos(heading))
+    offset.z = offset.z - adjustment.z
+    offset.heading = (offset.heading - adjustment.heading) % 360.0
+    return offset
+end
 local function sameOffset(a, b)
     if not a or not b then return false end
     local epsilon = 0.0001
@@ -141,7 +213,7 @@ local function groupPoses(groupName)
 end
 
 local function genderLock(entry)
-    local lock = entry and entry[2]
+    local lock = entry and entry[3]
     if lock == 'male' or lock == 'female' then return lock end
 end
 
@@ -162,7 +234,7 @@ end
 local function poseLabel(groupName, entry)
     local name = entry[1]
     local custom = entry[2]
-    if custom and custom ~= '' and custom ~= 'male' and custom ~= 'female' then return custom end
+    if custom and custom ~= '' then return custom end
 
     local group = ConfigGroups.Scenario[groupName]
     for _, prefix in ipairs(group.truncate or {}) do
@@ -184,6 +256,10 @@ end
 
 local function objectExists(entity)
     return entity and entity ~= 0 and DoesEntityExist(entity)
+end
+
+local function targetableObject(entity)
+    return objectExists(entity) and GetEntityModel(entity) ~= 0
 end
 
 local function attachedObjects(ped)
@@ -290,7 +366,8 @@ local function scanPointOffsetsAtPlayer()
                         Citizen.ResultAsFloat()
                     )
                     heading = tonumber(heading) or GetEntityHeading(PlayerPedId())
-                    local offset = pointToObjectOffset(coords, heading)
+                    local offset = withoutObjectOffset(withoutPoseOffset(
+                        pointToObjectOffset(coords, heading), selectedScenario))
                     if offset then
                         result[#result + 1] = {
                             coords = { x = coords.x, y = coords.y, z = coords.z },
@@ -378,8 +455,25 @@ local function startScenarioAtTransform(scenarioName, coords, heading)
     return true
 end
 
-local function startScenario(entity, scenarioName, offset)
-    local coords, heading = scenarioTransform(entity, offset)
+local function startScenarioInPlace(scenarioName, coords, heading)
+    -- Keep the existing editor routing, but use TASK_START_SCENARIO_AT_POSITION
+    -- for every scenario. When no transform is supplied, anchor it at the ped.
+    local ped = PlayerPedId()
+    local position = coords or GetEntityCoords(ped)
+    return startScenarioAtTransform(
+        scenarioName,
+        position,
+        heading ~= nil and heading or GetEntityHeading(ped)
+    )
+end
+
+local function startScenario(entity, scenarioName, pointOffset, poseOffsetOverride, objectOffsetOverride)
+    local adjustment = poseOffsetOverride
+    if adjustment == nil then adjustment = poseOffsetFor(scenarioName) end
+    local itemAdjustment = objectOffsetOverride
+    if itemAdjustment == nil then itemAdjustment = currentObjectOffset end
+    local posePoint = combinedOffset(pointOffset, adjustment)
+    local coords, heading = scenarioTransform(entity, combinedOffset(itemAdjustment or {}, posePoint))
     return startScenarioAtTransform(scenarioName, coords, heading)
 end
 
@@ -398,6 +492,7 @@ local function usePose(groupName, scenarioName, coordNumber)
         scenario = scenarioName,
         coordNumber = coordNumber,
         offset = copyOffset(offset),
+        pointGroup = currentLibrary.pointGroups[coordNumber] or DEFAULT_POINT_GROUP,
         origin = origin,
     })
     objectMenuVisible = false
@@ -530,6 +625,9 @@ local function refreshLibrary()
     local library = type(response.library) == 'table' and response.library or {}
     local offsets = type(library.offsets) == 'table' and library.offsets or {}
     local savedPoses = type(library.poses) == 'table' and library.poses or {}
+    local pointGroups = type(library.pointGroups) == 'table' and library.pointGroups or {}
+    local pointGroupNames = type(library.pointGroupNames) == 'table' and library.pointGroupNames or {}
+    local posePointGroups = type(library.posePointGroups) == 'table' and library.posePointGroups or {}
     local records = {}
     for _, visibility in ipairs({ 'show', 'noshow' }) do
         for groupName, poses in pairs(type(savedPoses[visibility]) == 'table' and savedPoses[visibility] or {}) do
@@ -540,6 +638,7 @@ local function refreshLibrary()
                         group = groupName,
                         scenario = scenarioName,
                         visibility = visibility,
+                        pointGroup = posePointGroups[scenarioName] or DEFAULT_POINT_GROUP,
                     }
                 end
             end
@@ -551,7 +650,11 @@ local function refreshLibrary()
         if a.scenario ~= b.scenario then return a.scenario:lower() < b.scenario:lower() end
         return false
     end)
-    currentLibrary = { records = records, offsets = offsets }
+    currentLibrary = { records = records, offsets = offsets, pointGroups = pointGroups, pointGroupNames = pointGroupNames }
+    currentPreset = type(response.preset) == 'string' and response.preset or nil
+    currentObjectOffset = type(response.objectOffset) == 'table' and copyOffset(response.objectOffset) or nil
+    poseOffsets = type(response.poseOffsets) == 'table' and response.poseOffsets or poseOffsets
+    canEditPoseOffsets = response.canEditPoseOffsets == true
     if activePose and activePose.model == selectedModel then
         local coordNumber
         for index, offset in ipairs(offsets) do
@@ -560,7 +663,7 @@ local function refreshLibrary()
         activePose.coordNumber = coordNumber
     end
     canDeleteGroups = response.canDelete == true
-    if not canDeleteGroups then modModeActive = false end
+    if not canDeleteGroups and not canEditPoseOffsets then modModeActive = false end
 end
 
 local function cameraTargetCoords()
@@ -648,6 +751,8 @@ local function closeFineTune()
     fineTuneActive = false
     pointScanSession = pointScanSession + 1
     editorOpening = false
+    editorScenarioInPlace = false
+    editorMoveSetActive = false
     poseMenuBlockedUntil = 0
     cameraLookActive = false
     stopFineTuneCamera(false)
@@ -655,11 +760,29 @@ local function closeFineTune()
     SendNUIMessage({ action = 'close' })
 end
 
+local function previewEditorScenario()
+    if editorMode == 'poseOffset' then
+        return startScenario(selectedObject, selectedScenario, editorPointOffset, currentOffset)
+    end
+    if editorMode == 'objectOffset' then
+        return startScenario(selectedObject, selectedScenario, editorPointOffset, nil, currentOffset)
+    end
+    if editorScenarioInPlace then
+        local posePoint = combinedOffset(currentOffset, poseOffsetFor(selectedScenario))
+        local offset = combinedOffset(currentObjectOffset or {}, posePoint)
+        local coords, heading = scenarioTransform(selectedObject, offset)
+        if not coords then return false end
+        return startScenarioInPlace(selectedScenario, coords, heading)
+    end
+    return startScenario(selectedObject, selectedScenario, currentOffset)
+end
+
 local function beginEditor(groupName, scenarioName, mode, coordNumber)
     if not objectExists(selectedObject) then
         notify('That object is no longer available.', 'error')
         return
     end
+    if mode == 'add' and not ensurePresetName() then return end
 
     if mode == 'add' then
         poseMenuBlockedUntil = GetGameTimer() + math.max(
@@ -683,47 +806,77 @@ local function beginEditor(groupName, scenarioName, mode, coordNumber)
         origin = copyTransform(activePose.origin),
     } or nil
     editorOrigin = pedTransform(PlayerPedId())
+    local groupConfig = ConfigGroups and ConfigGroups.Scenario and ConfigGroups.Scenario[groupName]
+    -- objectOffset defaults to true so custom/older groups retain the existing setup behavior.
+    local useObjectOffset = not groupConfig or groupConfig.objectOffset ~= false
+    local startInPlace = mode == 'add' and not useObjectOffset
+    editorScenarioInPlace = startInPlace
     local savedOffset = mode == 'modify' and editorCoordNumber and currentLibrary.offsets[editorCoordNumber] or nil
-    local activeObjectOffset = mode == 'add'
+    local activeObjectOffset = (mode == 'add' or mode == 'poseOffset' or mode == 'objectOffset')
         and activePose
         and activePose.entity == selectedObject
         and activePose.offset
         or nil
-    local selectedPointOffset = mode == 'add' and currentLibrary.offsets[selectedMenuCoord] or nil
-    currentOffset = copyOffset(savedOffset or activeObjectOffset or selectedPointOffset)
+    local selectedPointOffset = (mode == 'add' or mode == 'poseOffset' or mode == 'objectOffset') and currentLibrary.offsets[selectedMenuCoord] or nil
+    editorPointOffset = copyOffset(activeObjectOffset or selectedPointOffset)
+    currentOffset = mode == 'poseOffset'
+        and copyOffset(poseOffsetFor(scenarioName) or {})
+        or mode == 'objectOffset'
+            and copyOffset(currentObjectOffset or {})
+            or copyOffset(savedOffset or activeObjectOffset or selectedPointOffset)
     availablePointOffsets = {}
     editorOpening = true
 
     NtMenu.hide(false)
-    if not startScenario(selectedObject, selectedScenario, currentOffset) then
+    local manualObjectOffset = mode == 'objectOffset'
+    local started = manualObjectOffset or (startInPlace
+        and startScenarioInPlace(selectedScenario)
+        or previewEditorScenario())
+    if not started then
         editorOpening = false
         return
     end
 
-    Wait(math.max(0, math.floor(tonumber(ConfigTarget.PointSearchDelay) or 3000)))
+    if mode ~= 'poseOffset' and mode ~= 'objectOffset' then
+        Wait(math.max(0, math.floor(tonumber(ConfigTarget.PointSearchDelay) or 3000)))
+        if startInPlace then
+            local settled = pedTransform(PlayerPedId())
+            currentOffset = withoutObjectOffset(withoutPoseOffset(
+                pointToObjectOffset(settled, settled.heading), scenarioName))
+        end
+    end
     if not objectExists(selectedObject) then
         editorOpening = false
         ClearPedTasksImmediately(PlayerPedId())
         notify('That object is no longer available.', 'error')
         return
     end
-    collectPointOffsets()
+    if mode ~= 'poseOffset' and mode ~= 'objectOffset' then collectPointOffsets() end
 
     local gameplayCameraCoords = GetGameplayCamCoord()
     local objectCoords = GetEntityCoords(selectedObject)
-    local _, heading = scenarioTransform(selectedObject, currentOffset)
-    startFineTuneCamera(objectCoords, gameplayCameraCoords, heading)
+    local cameraOffset = mode == 'poseOffset'
+        and combinedOffset(currentObjectOffset or {}, combinedOffset(editorPointOffset, currentOffset))
+        or mode == 'objectOffset'
+            and combinedOffset(currentOffset, combinedOffset(editorPointOffset, poseOffsetFor(scenarioName)))
+            or combinedOffset(currentObjectOffset or {}, currentOffset)
+    local _, heading = scenarioTransform(selectedObject, cameraOffset)
+    if not manualObjectOffset then startFineTuneCamera(objectCoords, gameplayCameraCoords, heading) end
     fineTuneActive = true
+    editorMoveSetActive = not manualObjectOffset
     editorOpening = false
-    startPointScanner()
+    if mode ~= 'poseOffset' and mode ~= 'objectOffset' then startPointScanner() end
     local cameraZoomMin = tonumber(ConfigTarget.CameraZoomMin) or 0.75
     local cameraZoomMax = math.max(cameraZoomMin, tonumber(ConfigTarget.CameraZoomMax) or 8.0, orbitRadius)
     SetNuiFocus(true, true)
     SendNUIMessage({
         action = 'open',
-        editorTitle = mode == 'modify'
-            and (editorSettings.ModifyTitle or 'Modify point')
-            or (editorSettings.AddTitle or 'Add pose'),
+        editorTitle = mode == 'poseOffset'
+            and (editorSettings.PoseOffsetTitle or 'Adjust global pose offset')
+            or mode == 'objectOffset'
+                and (editorSettings.ObjectOffsetTitle or 'Adjust object offset')
+                or (mode == 'modify' and (editorSettings.ModifyTitle or 'Modify point')
+                or (editorSettings.AddTitle or 'Add pose')),
         scale = NtMenu.getScale(),
         points = availablePointOffsets,
         step = defaultEditorStep(),
@@ -736,9 +889,19 @@ local function beginEditor(groupName, scenarioName, mode, coordNumber)
         cameraZoomMax = cameraZoomMax,
         cameraZoomStep = ConfigTarget.CameraZoomStep,
         offset = currentOffset,
-        coordinates = currentLibrary.offsets,
-        selectedCoordinate = editorCoordNumber or selectedMenuCoord,
+        coordinates = (mode == 'poseOffset' or mode == 'objectOffset') and {} or currentLibrary.offsets,
+        selectedCoordinate = mode ~= 'poseOffset' and mode ~= 'objectOffset'
+            and not (mode == 'add' and not useObjectOffset)
+            and (editorCoordNumber or selectedMenuCoord)
+            or nil,
         showSeparatePoint = mode == 'modify',
+        manualOffset = manualObjectOffset,
+        movementLocked = manualObjectOffset,
+        canMoveSet = manualObjectOffset and selectedScenario ~= nil and editorPointOffset ~= nil,
+        playerCoordinates = manualObjectOffset and editorOrigin or nil,
+        objectCoordinates = manualObjectOffset and {
+            x = objectCoords.x, y = objectCoords.y, z = objectCoords.z,
+        } or nil,
     })
 end
 
@@ -791,8 +954,9 @@ end
 
 local function hiddenPoseCount()
     local count = 0
+    local selectedPointGroup = currentLibrary.pointGroups[selectedMenuCoord] or DEFAULT_POINT_GROUP
     for _, record in ipairs(currentLibrary.records or {}) do
-        if record.visibility == 'noshow' then count = count + 1 end
+        if record.visibility == 'noshow' and record.pointGroup == selectedPointGroup then count = count + 1 end
     end
     return count
 end
@@ -800,9 +964,10 @@ end
 local function openUndoMenu()
     if not canDeleteGroups then return end
     objectMenuVisible = false
+    local selectedPointGroup = currentLibrary.pointGroups[selectedMenuCoord] or DEFAULT_POINT_GROUP
     local options = {}
     for _, record in ipairs(currentLibrary.records or {}) do
-        if record.visibility == 'noshow' then
+        if record.visibility == 'noshow' and record.pointGroup == selectedPointGroup then
             local entry = configuredEntry(record.group, record.scenario)
             local label = poseLabel(record.group, entry)
             options[#options + 1] = {
@@ -911,7 +1076,10 @@ local function openMultiAddGroupMenu(groupName)
                 if a.group ~= b.group then return a.group < b.group end
                 return a.scenario < b.scenario
             end)
-            local result = lib.callback.await('nt_actions:server:bulkAddObjectPoses', false, selectedModel, request)
+            local presetName = ensurePresetName()
+            if not presetName then return end
+            local result = lib.callback.await('nt_actions:server:bulkAddObjectPoses', false, selectedModel, request,
+                currentLibrary.pointGroups[selectedMenuCoord] or DEFAULT_POINT_GROUP, presetName)
             if type(result) ~= 'table' then
                 notify('The selected poses could not be added.', 'error')
                 return
@@ -948,8 +1116,129 @@ local function openMultiAddMenu()
     end)
 end
 
-openObjectMenu = function(entity)
-    if fineTuneActive or not objectExists(entity) then return end
+local function presetPayload(entry, activeName)
+    local library = type(entry.library) == 'table' and entry.library or {}
+    local points, poses = {}, {}
+    local groupCounts = {}
+    for index, offset in ipairs(type(library.offsets) == 'table' and library.offsets or {}) do
+        local pointGroup = type(library.pointGroups) == 'table' and library.pointGroups[index] or DEFAULT_POINT_GROUP
+        groupCounts[pointGroup] = (groupCounts[pointGroup] or 0) + 1
+        points[#points + 1] = {
+            label = ('%s - Point %d (%.3f, %.3f, %.3f, %.1f)'):format(pointGroup, groupCounts[pointGroup],
+                tonumber(offset.x) or 0.0, tonumber(offset.y) or 0.0, tonumber(offset.z) or 0.0, tonumber(offset.heading) or 0.0),
+            offset = copyOffset(offset), pointGroup = pointGroup,
+        }
+    end
+    for _, visibility in ipairs({ 'show', 'noshow' }) do
+        for groupName, records in pairs(type(library.poses) == 'table' and library.poses[visibility] or {}) do
+            for _, record in ipairs(records) do
+                local entryConfig = configuredEntry(groupName, record.scenario)
+                if entryConfig then
+                    poses[#poses + 1] = {
+                        group = groupName, scenario = record.scenario, visibility = visibility,
+                        pointGroup = type(library.posePointGroups) == 'table' and library.posePointGroups[record.scenario] or DEFAULT_POINT_GROUP,
+                        label = poseLabel(groupName, entryConfig),
+                    }
+                end
+            end
+        end
+    end
+    table.sort(poses, function(a, b) return a.label:lower() < b.label:lower() end)
+    return { name = entry.name, active = entry.name == activeName, points = points, poses = poses }
+end
+
+local function openPresetEditor()
+    if not canDeleteGroups or not objectExists(selectedObject) then return end
+    local response = lib.callback.await('nt_actions:server:getPresets', false, selectedModel)
+    if type(response) ~= 'table' then notify('Presets could not be loaded.', 'error') return end
+    presetCache = {}
+    local payload = {}
+    for _, entry in ipairs(type(response.presets) == 'table' and response.presets or {}) do
+        local preset = presetPayload(entry, response.active)
+        presetCache[preset.name] = preset
+        payload[#payload + 1] = preset
+    end
+    presetEditorActive = true
+    objectMenuVisible = false
+    NtMenu.hide(false)
+    SetNuiFocus(true, true)
+    SendNUIMessage({ action = 'presetOpen', presets = payload })
+end
+
+local function closePresetEditor(reopenMenu)
+    if not presetEditorActive then return end
+    presetEditorActive = false
+    SetNuiFocus(false, false)
+    SendNUIMessage({ action = 'presetClose' })
+    if activePose and objectExists(activePose.entity) then
+        startScenario(activePose.entity, activePose.scenario, activePose.offset)
+    else
+        ClearPedTasks(PlayerPedId())
+        if posePropTracking then deleteTrackedPoseProps(PlayerPedId()) end
+    end
+    if reopenMenu and objectExists(selectedObject) then openObjectMenu(selectedObject, true) end
+end
+local function openGroupEditor()
+    if not canDeleteGroups or not objectExists(selectedObject) then return end
+    local grouped, names = {}, {}
+    local function ensureGroup(name)
+        name = type(name) == 'string' and name ~= '' and name or DEFAULT_POINT_GROUP
+        if not grouped[name] then
+            grouped[name] = { name = name, points = {}, poses = {} }
+            names[#names + 1] = name
+        end
+        return grouped[name]
+    end
+
+    for name in pairs(currentLibrary.pointGroupNames or {}) do ensureGroup(name) end
+
+    local localPointNumbers = {}
+    for offsetIndex, offset in ipairs(currentLibrary.offsets) do
+        local pointGroup = currentLibrary.pointGroups[offsetIndex] or DEFAULT_POINT_GROUP
+        localPointNumbers[pointGroup] = (localPointNumbers[pointGroup] or 0) + 1
+        ensureGroup(pointGroup).points[#ensureGroup(pointGroup).points + 1] = {
+            index = offsetIndex,
+            label = ('Point %d'):format(localPointNumbers[pointGroup]),
+            title = ('x %.3f, y %.3f, z %.3f, heading %.1f'):format(
+                tonumber(offset.x) or 0.0, tonumber(offset.y) or 0.0,
+                tonumber(offset.z) or 0.0, tonumber(offset.heading) or 0.0),
+        }
+    end
+    for _, record in ipairs(currentLibrary.records or {}) do
+        local pointGroup = record.pointGroup or DEFAULT_POINT_GROUP
+        local entry = configuredEntry(record.group, record.scenario)
+        ensureGroup(pointGroup).poses[#ensureGroup(pointGroup).poses + 1] = {
+            group = record.group,
+            scenario = record.scenario,
+            label = entry and poseLabel(record.group, entry) or prettyWords(record.scenario),
+            visibility = record.visibility,
+        }
+    end
+    if #names == 0 then ensureGroup(DEFAULT_POINT_GROUP) end
+    table.sort(names, function(a, b) return a:lower() < b:lower() end)
+    local groups = {}
+    for _, name in ipairs(names) do
+        local group = grouped[name]
+        table.sort(group.poses, function(a, b) return a.label:lower() < b.label:lower() end)
+        groups[#groups + 1] = group
+    end
+
+    groupEditorActive = true
+    objectMenuVisible = false
+    NtMenu.hide(false)
+    SetNuiFocus(true, true)
+    SendNUIMessage({ action = 'groupEditorOpen', groups = groups })
+end
+
+local function closeGroupEditor(reopenMenu)
+    if not groupEditorActive then return end
+    groupEditorActive = false
+    SetNuiFocus(false, false)
+    SendNUIMessage({ action = 'groupEditorClose' })
+    if reopenMenu and objectExists(selectedObject) then openObjectMenu(selectedObject, true) end
+end
+openObjectMenu = function(entity, preserveSelectedPoint)
+    if fineTuneActive or not targetableObject(entity) then return end
     local objectChanged = selectedObject ~= entity
     if objectChanged then
         modModeActive = false
@@ -958,9 +1247,9 @@ openObjectMenu = function(entity)
     selectedObject = entity
     selectedModel = GetEntityModel(entity)
     refreshLibrary()
-    if activePose and activePose.entity == selectedObject and activePose.coordNumber then
+    if not preserveSelectedPoint and activePose and activePose.entity == selectedObject and activePose.coordNumber then
         selectedMenuCoord = activePose.coordNumber
-    elseif not inPose then
+    elseif not preserveSelectedPoint and not inPose then
         selectedMenuCoord = 1
     end
     if #currentLibrary.offsets > 0 then
@@ -970,10 +1259,11 @@ openObjectMenu = function(entity)
     end
     objectMenuVisible = true
 
+    local selectedPointGroup = currentLibrary.pointGroups[selectedMenuCoord] or DEFAULT_POINT_GROUP
     local options = {}
     for _, record in ipairs(currentLibrary.records or {}) do
         local entry = configuredEntry(record.group, record.scenario)
-        if record.visibility == 'show' and entry and compatible(entry) then
+        if record.visibility == 'show' and record.pointGroup == selectedPointGroup and entry and compatible(entry) then
             local label = poseLabel(record.group, entry)
             options[#options + 1] = {
                 label = label,
@@ -991,43 +1281,74 @@ openObjectMenu = function(entity)
 
     local isActiveObject = activePose and activePose.entity == selectedObject
     local moderatorEditing = canDeleteGroups and modModeActive
+    local poseOffsetEditing = canEditPoseOffsets and modModeActive
     local footer = {}
     if moderatorEditing then
+        -- Three-column management rows: primary actions, then configuration actions.
         footer[#footer + 1] = { label = configuredText('AddPose', 'Add Pose'), args = { action = 'add' } }
-    end
-    if isActiveObject then
-        if moderatorEditing then
+        if isActiveObject then
             footer[#footer + 1] = {
                 label = configuredText('Modify', 'Modify'),
                 disabled = not activePose.coordNumber,
                 args = { action = 'modify' },
             }
         end
-        footer[#footer + 1] = { label = configuredText('Leave', 'Leave Pose'), args = { action = 'leave' } }
-    elseif inPose then
-        footer[#footer + 1] = { label = configuredText('Leave', 'Leave Pose'), args = { action = 'leave' } }
-        footer[#footer + 1] = { label = configuredText('Exit', 'Exit'), args = { action = 'exit' } }
-    else
-        footer[#footer + 1] = { label = configuredText('Exit', 'Exit'), args = { action = 'exit' } }
-    end
-    if moderatorEditing then
+        footer[#footer + 1] = { label = 'Multi Add', args = { action = 'multiAdd' } }
+        if isActiveObject and poseOffsetEditing then
+            footer[#footer + 1] = {
+                label = configuredText('PoseOffset', 'Pose Offset'),
+                disabled = not activePose.coordNumber,
+                args = { action = 'poseOffset' },
+            }
+        end
         footer[#footer + 1] = {
-            label = 'Multi Add',
-            args = { action = 'multiAdd' },
+            label = 'Object Offset',
+            disabled = not currentPreset,
+            args = { action = 'objectOffset' },
         }
+        footer[#footer + 1] = { label = 'Group Edit', args = { action = 'groupEdit' } }
+        footer[#footer + 1] = {
+            label = currentPreset and 'Presets' or 'Add Preset',
+            args = { action = 'presets' },
+        }
+
         footer[#footer + 1] = {
             label = configuredText('Undo', 'Undo'), disabled = hiddenPoseCount() == 0,
             args = { action = 'undo' },
         }
+        -- Leave/Exit actions span the entire bottom row.
+        if isActiveObject or inPose then
+            footer[#footer + 1] = { label = configuredText('Leave', 'Leave Pose'), wide = true, args = { action = 'leave' } }
+        end
+        if inPose and not isActiveObject then
+            footer[#footer + 1] = { label = configuredText('Exit', 'Exit'), wide = true, args = { action = 'exit' } }
+        elseif not inPose then
+            footer[#footer + 1] = { label = configuredText('Exit', 'Exit'), wide = true, args = { action = 'exit' } }
+        end
+    else
+        if isActiveObject then
+            if poseOffsetEditing then
+                footer[#footer + 1] = {
+                    label = configuredText('PoseOffset', 'Pose Offset'),
+                    disabled = not activePose.coordNumber,
+                    args = { action = 'poseOffset' },
+                }
+            end
+            footer[#footer + 1] = { label = configuredText('Leave', 'Leave Pose'), wide = true, args = { action = 'leave' } }
+        elseif inPose then
+            footer[#footer + 1] = { label = configuredText('Leave', 'Leave Pose'), wide = true, args = { action = 'leave' } }
+            footer[#footer + 1] = { label = configuredText('Exit', 'Exit'), wide = true, args = { action = 'exit' } }
+        else
+            footer[#footer + 1] = { label = configuredText('Exit', 'Exit'), wide = true, args = { action = 'exit' } }
+        end
     end
-
     NtMenu.open(configuredText('ObjectTitle', 'Object Poses'), options, function(_, args)
         if args.action == 'pose' then usePose(args.group, args.scenario, selectedMenuCoord) end
     end, function()
         objectMenuVisible = false
     end, {
         footerActions = footer,
-        showMod = canDeleteGroups,
+        showMod = canDeleteGroups or canEditPoseOffsets,
         modActive = modModeActive,
         onMod = function()
             modModeActive = not modModeActive
@@ -1039,6 +1360,21 @@ openObjectMenu = function(entity)
                 openAddGroupMenu()
             elseif args.action == 'modify' and activePose and activePose.coordNumber then
                 beginEditor(activePose.group, activePose.scenario, 'modify', activePose.coordNumber)
+            elseif args.action == 'poseOffset' and activePose and activePose.coordNumber and canEditPoseOffsets then
+                beginEditor(activePose.group, activePose.scenario, 'poseOffset', activePose.coordNumber)
+            elseif args.action == 'objectOffset' and canDeleteGroups and currentPreset then
+                local record = activePose and activePose.entity == selectedObject and activePose or nil
+                if not record then
+                    local pointGroup = currentLibrary.pointGroups[selectedMenuCoord] or DEFAULT_POINT_GROUP
+                    for _, candidate in ipairs(currentLibrary.records or {}) do
+                        if candidate.visibility == 'show' and candidate.pointGroup == pointGroup then
+                            record = candidate
+                            break
+                        end
+                    end
+                end
+                beginEditor(record and record.group, record and record.scenario, 'objectOffset',
+                    record and record.coordNumber or selectedMenuCoord)
             elseif args.action == 'leave' then
                 leavePose()
                 objectMenuVisible = false
@@ -1050,6 +1386,10 @@ openObjectMenu = function(entity)
                 openUndoMenu()
             elseif args.action == 'multiAdd' then
                 openMultiAddMenu()
+            elseif args.action == 'groupEdit' then
+                openGroupEditor()
+            elseif args.action == 'presets' then
+                openPresetEditor()
             end
         end,
         onDelete = function(_, args)
@@ -1062,20 +1402,33 @@ openObjectMenu = function(entity)
                 notify('You do not have permission to remove that pose.', 'error')
                 return
             end
-            if activePose and activePose.entity == selectedObject and activePose.group == args.group
-                and activePose.scenario == args.scenario
-            then
-                leavePose()
-            end
+
             notify(('%s was hidden from this object.'):format(args.poseLabel or 'Pose'), 'success')
             NtMenu.hide(false)
             openObjectMenu(selectedObject)
         end,
-        coordinates = currentLibrary.offsets,
+        coordinateOptions = (function()
+            local result = {}
+            local groupCounts = {}
+            for coordNumber, offset in ipairs(currentLibrary.offsets) do
+                local pointGroup = currentLibrary.pointGroups[coordNumber] or DEFAULT_POINT_GROUP
+                groupCounts[pointGroup] = (groupCounts[pointGroup] or 0) + 1
+                result[coordNumber] = {
+                    label = tostring(groupCounts[pointGroup]),
+                    title = ('%s, point %d'):format(pointGroup, groupCounts[pointGroup]),
+                    pointGroup = pointGroup,
+                    args = { pointGroup = pointGroup },
+                    deletable = canDeleteGroups and modModeActive,
+                }
+            end
+            return result
+        end)(),
         selectedCoordinate = selectedMenuCoord,
-        coordinatesDeletable = canDeleteGroups and modModeActive,
         onCoordinateSelect = function(coordNumber)
-            if currentLibrary.offsets[coordNumber] then selectedMenuCoord = coordNumber end
+            if not currentLibrary.offsets[coordNumber] then return end
+            selectedMenuCoord = coordNumber
+            NtMenu.hide(false)
+            openObjectMenu(selectedObject, true)
         end,
         onCoordinateDelete = function(coordNumber)
             local removed = lib.callback.await('nt_actions:server:deleteObjectPoint', false, selectedModel, coordNumber)
@@ -1092,40 +1445,189 @@ end
 
 AddEventHandler('nt_actions:client:openCachedPoseList', function()
     if not inPose or not objectExists(cachedPoseObject) then
-        setActivePose(nil)
         notify('The object for the active pose is no longer available.', 'error')
         return
     end
     openObjectMenu(cachedPoseObject)
 end)
 
+RegisterNetEvent('nt_actions:client:poseOffsetUpdated', function(scenarioName, offset)
+    if type(scenarioName) ~= 'string' then return end
+    poseOffsets[scenarioName] = type(offset) == 'table' and copyOffset(offset) or nil
+    if activePose and activePose.scenario == scenarioName and objectExists(activePose.entity) and not fineTuneActive then
+        startScenario(activePose.entity, activePose.scenario, activePose.offset)
+    end
+end)
+
+local function refreshTargetAccess()
+    local access = lib.callback.await('nt_actions:server:getTargetAccess', false) or {}
+    local models = {}
+    for _, model in ipairs(type(access.models) == 'table' and access.models or {}) do
+        model = tonumber(model)
+        if model then models[model] = true end
+    end
+    cachedTargetModels = models
+    canTargetUnregistered = access.canTargetUnregistered == true
+end
+
+local function canTargetObject(entity)
+    if fineTuneActive or not targetableObject(entity) then return false end
+    return canTargetUnregistered or cachedTargetModels[GetEntityModel(entity)] == true
+end
+
 RegisterNetEvent('nt_actions:client:objectLibraryUpdated', function(model)
+    refreshTargetAccess()
     if objectMenuVisible and selectedModel == model and objectExists(selectedObject) then
         NtMenu.hide(false)
         openObjectMenu(selectedObject)
     end
 end)
 
+RegisterNetEvent('RSGCore:Client:OnPlayerLoaded', refreshTargetAccess)
+RegisterNetEvent('RSGCore:Client:OnJobUpdate', refreshTargetAccess)
+RegisterNetEvent('RSGCore:Client:SetDuty', refreshTargetAccess)
+
 CreateThread(function()
     Wait(0)
+    poseOffsets = lib.callback.await('nt_actions:server:getPoseOffsets', false) or {}
+    refreshTargetAccess()
     exports.ox_target:addGlobalObject({
         {
             name = TARGET_OPTION,
             icon = ConfigTarget.TargetIcon,
             label = ConfigTarget.TargetLabel,
             distance = ConfigTarget.TargetDistance,
-            canInteract = function()
-                return not fineTuneActive
+            canInteract = function(entity)
+                return canTargetObject(entity)
             end,
             onSelect = function(data)
-                openObjectMenu(data.entity)
+                local entity = data and data.entity
+                if canTargetObject(entity) then openObjectMenu(entity) end
             end,
         },
     })
 end)
 
+-- Duty changes are event-driven above; this fallback supports core versions
+-- that do not emit every client job event.
+CreateThread(function()
+    while true do
+        Wait(5000)
+        refreshTargetAccess()
+    end
+end)
+
+RegisterNUICallback('presetClose', function(_, cb)
+    closePresetEditor(true)
+    cb({ ok = true })
+end)
+
+RegisterNUICallback('presetPreview', function(data, cb)
+    local preset = presetEditorActive and presetCache[type(data.preset) == 'string' and data.preset or ''] or nil
+    local pointIndex = tonumber(data.point)
+    local scenarioName = type(data.pose) == 'string' and data.pose or nil
+    local point = preset and pointIndex and preset.points[pointIndex] or nil
+    local valid = false
+    if preset and scenarioName then
+        for _, pose in ipairs(preset.poses) do if pose.scenario == scenarioName then valid = true break end end
+    end
+    cb({ ok = valid and point and startScenario(selectedObject, scenarioName, point.offset) == true or false })
+end)
+
+RegisterNUICallback('presetApply', function(data, cb)
+    local name = type(data.name) == 'string' and data.name or nil
+    if not presetEditorActive or not name or not presetCache[name] then cb({ ok = false, error = 'Select a valid preset.' }) return end
+    local remove = data.remove == true
+    if remove and presetCache[name].active ~= true then
+        cb({ ok = false, error = 'That preset is not active on this object.' })
+        return
+    end
+    local callbackName = remove and 'nt_actions:server:removeObjectPreset'
+        or 'nt_actions:server:applyObjectPreset'
+    local saved = lib.callback.await(callbackName, false, selectedModel, name)
+    if saved ~= true then cb({ ok = false, error = 'The server rejected this preset change.' }) return end
+    if remove then leavePose() end
+    refreshLibrary()
+    closePresetEditor(true)
+    notify(remove
+        and ('%s was removed from this object.'):format(name)
+        or ('%s was applied to this object.'):format(name), 'success')
+    cb({ ok = true })
+end)
+
+RegisterNUICallback('presetRename', function(data, cb)
+    local oldName = type(data.oldName) == 'string' and data.oldName or nil
+    local name = type(data.name) == 'string' and data.name or nil
+    if not presetEditorActive or not oldName or not name or not presetCache[oldName] then
+        cb({ ok = false, error = 'Select a preset and enter its new name.' })
+        return
+    end
+    local saved = lib.callback.await('nt_actions:server:renamePreset', false, oldName, name)
+    if saved ~= true then
+        cb({ ok = false, error = 'That preset name is invalid or already exists.' })
+        return
+    end
+    refreshLibrary()
+    closePresetEditor(true)
+    notify(('%s was renamed to %s.'):format(oldName, name), 'success')
+    cb({ ok = true })
+end)
+RegisterNUICallback('groupEditorCancel', function(_, cb)
+    if not groupEditorActive then cb({ ok = false }) return end
+    closeGroupEditor(true)
+    cb({ ok = true })
+end)
+
+RegisterNUICallback('groupEditorSave', function(data, cb)
+    if not groupEditorActive or not canDeleteGroups or type(data.groups) ~= 'table' then
+        cb({ ok = false, error = 'The group editor is not authorized.' })
+        return
+    end
+    local saved = lib.callback.await('nt_actions:server:savePointGroups', false, selectedModel, data.groups)
+    if saved ~= true then
+        cb({ ok = false, error = 'The server rejected the group assignments. Check names and ensure pose groups contain points.' })
+        return
+    end
+    refreshLibrary()
+    closeGroupEditor(true)
+    notify('Point groups were saved.', 'success')
+    cb({ ok = true })
+end)
+local function editorOffsetValue(data)
+    local value = type(data) == 'table' and data.offset or nil
+    if type(value) ~= 'table' then return nil end
+    local maximum = tonumber(ConfigTarget.MaxOffset) or 6.0
+    local clean = {
+        x = tonumber(value.x), y = tonumber(value.y), z = tonumber(value.z),
+        heading = tonumber(value.heading),
+    }
+    if not clean.x or not clean.y or not clean.z or not clean.heading then return nil end
+    if math.abs(clean.x) > maximum or math.abs(clean.y) > maximum or math.abs(clean.z) > maximum then return nil end
+    clean.heading = clean.heading % 360.0
+    return clean
+end
+
+RegisterNUICallback('moveSet', function(data, cb)
+    if not fineTuneActive or editorMode ~= 'objectOffset' or editorMoveSetActive then cb({ ok = false }) return end
+    local value = editorOffsetValue(data)
+    if not value then cb({ ok = false, error = 'Enter valid offsets within the configured limit.' }) return end
+    if not selectedScenario or not editorPointOffset then
+        cb({ ok = false, error = 'This preset needs a pose and point before Move Set can be used.' })
+        return
+    end
+    currentOffset = value
+    if not previewEditorScenario() then cb({ ok = false }) return end
+    local gameplayCameraCoords = GetGameplayCamCoord()
+    local objectCoords = GetEntityCoords(selectedObject)
+    local cameraOffset = combinedOffset(currentOffset, combinedOffset(editorPointOffset, poseOffsetFor(selectedScenario)))
+    local _, heading = scenarioTransform(selectedObject, cameraOffset)
+    startFineTuneCamera(objectCoords, gameplayCameraCoords, heading)
+    editorMoveSetActive = true
+    cb({ ok = true, offset = currentOffset })
+end)
+
 RegisterNUICallback('move', function(data, cb)
-    if not fineTuneActive or not currentOffset then cb({ ok = false }) return end
+    if not fineTuneActive or not editorMoveSetActive or not currentOffset then cb({ ok = false }) return end
     local minimum = tonumber(ConfigTarget.FineTuneStepMin) or 0.005
     local maximum = tonumber(ConfigTarget.FineTuneStepMax) or 0.25
     local step = math.max(minimum, math.min(maximum, tonumber(data.step) or defaultEditorStep()))
@@ -1139,11 +1641,11 @@ RegisterNUICallback('move', function(data, cb)
     currentOffset.x = math.max(-maxOffset, math.min(maxOffset, currentOffset.x))
     currentOffset.y = math.max(-maxOffset, math.min(maxOffset, currentOffset.y))
     currentOffset.z = math.max(-maxOffset, math.min(maxOffset, currentOffset.z))
-    cb({ ok = startScenario(selectedObject, selectedScenario, currentOffset), offset = currentOffset })
+    cb({ ok = previewEditorScenario(), offset = currentOffset })
 end)
 
 RegisterNUICallback('rotate', function(data, cb)
-    if not fineTuneActive or not currentOffset then cb({ ok = false }) return end
+    if not fineTuneActive or not editorMoveSetActive or not currentOffset then cb({ ok = false }) return end
     local minimum = tonumber(ConfigTarget.FineTuneStepMin) or 0.005
     local maximum = tonumber(ConfigTarget.FineTuneStepMax) or 0.25
     local movement = math.max(minimum, math.min(maximum, tonumber(data.step) or defaultEditorStep()))
@@ -1151,7 +1653,7 @@ RegisterNUICallback('rotate', function(data, cb)
     if data.direction == 'counterclockwise' then currentOffset.heading = currentOffset.heading - step end
     if data.direction == 'clockwise' then currentOffset.heading = currentOffset.heading + step end
     currentOffset.heading = currentOffset.heading % 360.0
-    cb({ ok = startScenario(selectedObject, selectedScenario, currentOffset), offset = currentOffset })
+    cb({ ok = previewEditorScenario(), offset = currentOffset })
 end)
 
 RegisterNUICallback('cameraLook', function(_, cb)
@@ -1190,7 +1692,7 @@ RegisterNUICallback('cameraZoom', function(data, cb)
 end)
 
 RegisterNUICallback('selectEditorCoord', function(data, cb)
-    if not fineTuneActive then cb({ ok = false }) return end
+    if not fineTuneActive or editorMode == 'poseOffset' or editorMode == 'objectOffset' then cb({ ok = false }) return end
     local coordNumber = tonumber(data.coordNumber)
     local selected = coordNumber and currentLibrary.offsets[coordNumber] or nil
     local pointIndex = tonumber(data.pointIndex)
@@ -1203,17 +1705,48 @@ RegisterNUICallback('selectEditorCoord', function(data, cb)
     end
     if not selected then cb({ ok = false }) return end
     currentOffset = copyOffset(selected)
-    local ok
-    if point then
-        ok = startScenarioAtTransform(selectedScenario, point.coords, point.heading)
-    else
-        ok = startScenario(selectedObject, selectedScenario, currentOffset)
-    end
+    local ok = startScenario(selectedObject, selectedScenario, currentOffset)
     cb({ ok = ok, offset = currentOffset })
 end)
 
 RegisterNUICallback('confirm', function(data, cb)
     if not fineTuneActive then cb({ ok = false }) return end
+    if editorMode == 'objectOffset' then
+        local manualValue = editorOffsetValue(data)
+        if manualValue then currentOffset = manualValue end
+        if not currentOffset then cb({ ok = false }) return end
+        local saved = lib.callback.await('nt_actions:server:saveObjectOffset', false, selectedModel, currentOffset)
+        if type(saved) ~= 'table' then
+            notify('The object offset could not be saved.', 'error')
+            cb({ ok = false })
+            return
+        end
+        currentObjectOffset = type(saved.offset) == 'table' and copyOffset(saved.offset) or nil
+        if activePose and activePose.entity == selectedObject then
+            startScenario(activePose.entity, activePose.scenario, activePose.offset)
+        end
+        closeFineTune()
+        notify('The object offset was saved.', 'success')
+        cb({ ok = true })
+        return
+    end    if editorMode == 'poseOffset' then
+        local saved = lib.callback.await(
+            'nt_actions:server:savePoseOffset', false, selectedGroup, selectedScenario, currentOffset)
+        if type(saved) ~= 'table' then
+            notify('The global pose offset could not be saved.', 'error')
+            cb({ ok = false })
+            return
+        end
+        poseOffsets[selectedScenario] = saved.offset
+        if saved.offset == nil then poseOffsets[selectedScenario] = nil end
+        if activePose and activePose.scenario == selectedScenario then
+            startScenario(activePose.entity, activePose.scenario, activePose.offset)
+        end
+        closeFineTune()
+        notify(('%s global pose offset was saved.'):format(poseLabel(selectedGroup, configuredEntry(selectedGroup, selectedScenario))), 'success')
+        cb({ ok = true })
+        return
+    end
     local saved = lib.callback.await(
         'nt_actions:server:saveObjectPose',
         false,
@@ -1223,7 +1756,9 @@ RegisterNUICallback('confirm', function(data, cb)
         currentOffset,
         editorMode,
         editorCoordNumber or 0,
-        data.separate == true
+        data.separate == true,
+        currentLibrary.pointGroups[editorCoordNumber or selectedMenuCoord] or DEFAULT_POINT_GROUP,
+        currentPreset
     )
     if type(saved) ~= 'table' then
         notify('The pose could not be saved.', 'error')
@@ -1251,23 +1786,10 @@ end)
 RegisterNUICallback('cancel', function(_, cb)
     if fineTuneActive then
         closeFineTune()
-        if editorMode == 'add' then
-            setActivePose({
-                entity = selectedObject,
-                model = selectedModel,
-                group = selectedGroup,
-                scenario = selectedScenario,
-                coordNumber = nil,
-                offset = copyOffset(currentOffset),
-                origin = editorPreviousPose and copyTransform(editorPreviousPose.origin)
-                    or copyTransform(editorOrigin),
-            })
-            leavePose()
-        elseif editorPreviousPose and objectExists(editorPreviousPose.entity) then
+        if editorPreviousPose and objectExists(editorPreviousPose.entity) then
             setActivePose(editorPreviousPose)
             startScenario(activePose.entity, activePose.scenario, activePose.offset)
         else
-            setActivePose(nil)
             finishPosePropCleanup(PlayerPedId())
             ClearPedTasksImmediately(PlayerPedId())
             if editorOrigin then
@@ -1279,23 +1801,14 @@ RegisterNUICallback('cancel', function(_, cb)
     cb({ ok = true })
 end)
 
-CreateThread(function()
-    while true do
-        Wait(750)
-        if activePose and not fineTuneActive and not editorOpening
-            and (not objectExists(activePose.entity) or not IsPedActiveInScenario(PlayerPedId()))
-        then
-            finishPosePropCleanup(PlayerPedId())
-            setActivePose(nil)
-        end
-    end
-end)
 
 AddEventHandler('onResourceStop', function(resourceName)
     if resourceName ~= GetCurrentResourceName() then return end
     exports.ox_target:removeGlobalObject(TARGET_OPTION)
     if posePropTracking then deleteTrackedPoseProps(PlayerPedId()) end
     if fineTuneActive then closeFineTune() end
+    if groupEditorActive then closeGroupEditor(false) end
+    if presetEditorActive then closePresetEditor(false) end
 end)
 
 -- Narrow client API used by the isolated batch-review feature.

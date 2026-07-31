@@ -4,7 +4,7 @@ ConfigTarget = {
     TargetIcon = 'fa-solid fa-person',
     TargetDistance = 2.5,
 
-    -- Jobs listed here may toggle Mod and manage hidden poses/unused coords, on or off duty.
+    -- On-duty jobs listed here may target unregistered objects, toggle Mod, and manage libraries.
     AdminJobs = {
         "admin",
         "actionsMod",
@@ -24,6 +24,7 @@ ConfigTarget = {
         AddPose = 'Add Pose',
         AddGroupTitle = 'Add Pose Group',
         Modify = 'Modify',
+        PoseOffset = 'Pose Offset',
         Leave = 'Leave Pose',
         Exit = 'Exit',
         Undo = 'Undo',
@@ -38,6 +39,8 @@ ConfigTarget = {
     PoseEditor = {
         AddTitle = 'Add pose',
         ModifyTitle = 'Modify point',
+        PoseOffsetTitle = 'Adjust global pose offset',
+        ObjectOffsetTitle = 'Adjust object offset',
         DefaultStep = 0.025,
         DefaultCameraZoom = 2.5,
     },
@@ -73,6 +76,7 @@ ConfigTarget = {
 
     -- Shared object pose libraries are saved inside this resource.
     CacheFile = 'object_offsets.json',
+    PoseOffsetFile = 'pose_offset.json',
 
     BatchReview = {
         File = 'object_offsets review.json',
