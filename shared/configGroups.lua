@@ -131,7 +131,7 @@ ConfigGroups.Scenario = {
             {"WORLD_HUMAN_LEAN_BACK_WHITTLE", "Lean Back Whittle", ""},
             {"WORLD_HUMAN_LEAN_POST_LEFT", "Lean Post Left", ""},
             {"WORLD_HUMAN_LEAN_POST_RIGHT", "Lean Post Right", ""},
-            {"WORLD_HUMAN_LEAN_RAILING", "Lean Railing", ""},
+            {"WORLD_HUMAN_LEAN_RAILING_NO_PROPS", "Lean Railing", ""},
             {"WORLD_HUMAN_LEAN_RAILING_DRINKING", "Lean Railing Drinking", "male"},
             {"WORLD_HUMAN_LEAN_RAILING_SMOKING", "Lean Railing Smoking", ""},
             {"WORLD_HUMAN_LEAN_WALL_DRINKING", "Lean Wall Drinking", ""},

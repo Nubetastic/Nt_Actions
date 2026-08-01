@@ -41,6 +41,7 @@ ConfigTarget = {
         ModifyTitle = 'Modify point',
         PoseOffsetTitle = 'Adjust global pose offset',
         ObjectOffsetTitle = 'Adjust object offset',
+        CoordOffsetTitle = 'Adjust coordinate offset',
         DefaultStep = 0.025,
         DefaultCameraZoom = 2.5,
     },

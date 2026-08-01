@@ -4,5 +4,8 @@
   "PROP_HUMAN_SEAT_BENCH_HARMONICA_UPBEAT": { "x": 0.0, "y": 0.125, "z": 0.0, "heading": 355.0 },
   "PROP_HUMAN_SEAT_CHAIR_FAN": { "x": 0.0, "y": 0.0, "z": 0.0, "heading": 36.0 },
   "WORLD_HUMAN_DRUNK_BAR_SLUMPED": { "x": 0.0, "y": 0.25, "z": 0.0, "heading": 200.0 },
+  "WORLD_HUMAN_LEAN_RAILING": { "x": 0.0, "y": 0.075, "z": 0.0, "heading": 0.0 },
+  "WORLD_HUMAN_LEAN_RAILING_DRINKING": { "x": 0.0, "y": -0.025, "z": 0.0, "heading": 0.0 },
+  "WORLD_HUMAN_LEAN_RAILING_NO_PROPS": { "x": 0.0, "y": 0.075, "z": 0.0, "heading": 0.0 },
   "WORLD_HUMAN_LEAN_RAILING_SMOKING": { "x": 0.0, "y": 0.07999999999999, "z": 0.0, "heading": 0.0 }
 }

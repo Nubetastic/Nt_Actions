@@ -20,6 +20,7 @@ On-duty jobs in `ConfigTarget.AdminJobs` can target unregistered objects, enable
 - **Multi Add** publishes several compatible configured poses at once.
 - **Modify** edits the active point. Enable **Add as new point** to preserve the original and create another point.
 - **Object Offset** applies one correction to the current object model/preset assignment. The editor opens in manual mode first, shows the player and object world coordinates, and accepts X, Y, Z, and heading directly. Manual values can be saved without entering a pose. Select **Move Set** to enable the movement controls and pose/camera preview.
+- **Coord Offset** applies an additional correction to the selected coordinate on the current object model/preset assignment. It is tied to that object assignment and coordinate ID, and is layered on top of the Object Offset. Use Object Offset to align the preset as a whole, then use Coord Offset to fine-tune individual points without changing the reusable preset coordinates.
 - **Group Edit** creates, renames, and removes point groups and assigns saved points and poses to them.
 - **Presets** previews, applies, removes, and renames reusable object-pose libraries.
 - **Undo** restores hidden poses or permanently deletes them.
@@ -30,7 +31,7 @@ Nearby native scenario points detected by the Add/Modify editor appear temporari
 
 **Pose Offset** is available in Mod mode while an on-duty authorized reviewer is using a pose. It applies a global X, Y, Z, and heading correction to that scenario everywhere it is used. These corrections are stored separately in `pose_offset.json` and require a job listed in `ConfigTarget.ReviewJobs`.
 
-Use Pose Offset for a scenario-wide animation alignment problem. Use Object Offset when every pose on a particular object model or preset needs the same correction. Modify an individual point when only one placement needs adjustment.
+Use Pose Offset for a scenario-wide animation alignment problem. Use Object Offset to align every point on a particular object model/preset assignment, then use Coord Offset for any points that still need object-specific fine adjustment. Modify an individual point only when the reusable preset coordinate itself should change for every object using that preset.
 
 ### Presets
 

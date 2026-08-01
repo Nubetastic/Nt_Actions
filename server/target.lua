@@ -45,13 +45,14 @@ local function normaliseOffset(value)
     if not x or not y or not z or not heading then return nil end
     if x ~= x or y ~= y or z ~= z or heading ~= heading then return nil end
     if math.abs(x) > maxOffset or math.abs(y) > maxOffset or math.abs(z) > maxOffset then return nil end
-    return { x = x, y = y, z = z, heading = heading % 360.0 }
+    return { id = tonumber(value.id), x = x, y = y, z = z, heading = heading % 360.0 }
 end
 
 local function newLibrary(model)
     return {
         item = model,
         offsets = {},
+        nextOffsetId = 1,
         pointGroups = {},
         pointGroupNames = {},
         posePointGroups = {},
@@ -72,6 +73,11 @@ end
 local function objectOffsetForModel(model)
     local saved = libraries[tostring(model)]
     return saved and saved.offset or nil
+end
+
+local function coordOffsetsForModel(model)
+    local saved = libraries[tostring(model)]
+    return saved and saved.coordOffsets or nil
 end
 
 local function cleanPresetName(value)
@@ -123,6 +129,13 @@ local function offsetNumber(library, offset, pointGroup)
         library.pointGroups[existing] = library.pointGroups[existing] or pointGroup or DEFAULT_POINT_GROUP
         return existing
     end
+    local requestedId = tonumber(offset.id)
+    local id = requestedId and requestedId % 1 == 0 and requestedId > 0 and requestedId or library.nextOffsetId or 1
+    local used = {}
+    for _, saved in ipairs(library.offsets) do used[tonumber(saved.id)] = true end
+    while used[id] do id = id + 1 end
+    offset.id = id
+    library.nextOffsetId = math.max(library.nextOffsetId or 1, id + 1)
     library.offsets[#library.offsets + 1] = offset
     library.pointGroups[#library.offsets] = pointGroup or DEFAULT_POINT_GROUP
     return #library.offsets
@@ -397,8 +410,15 @@ local function loadLibraries()
                 or type(assignment) == 'table' and (assignment.preset or assignment[1])
             local offsetValue = type(assignment) == 'table' and (assignment.offset or assignment[2]) or nil
             local offset = normaliseOffset(offsetValue)
+            local coordOffsets = {}
+            if type(assignment) == 'table' and type(assignment.coordOffsets) == 'table' then
+                for id, value in pairs(assignment.coordOffsets) do
+                    local clean, numericId = normaliseOffset(value), tonumber(id)
+                    if clean and numericId and numericId > 0 and numericId % 1 == 0 then coordOffsets[tostring(numericId)] = clean end
+                end
+            end
             if validModel(model) and type(presetName) == 'string' and presetName ~= '' then
-                libraries[tostring(model)] = { item = model, preset = presetName, offset = offset }
+                libraries[tostring(model)] = { item = model, preset = presetName, offset = offset, coordOffsets = coordOffsets }
             end
         end
     elseif type(decoded.objects) == 'table' then
@@ -406,7 +426,7 @@ local function loadLibraries()
     else
         migrated = importObjectValues(decoded) or true
     end
-    return migrated
+    return true
 end
 local function poseOrder(scenarioName)
     return tonumber(masterOrder and masterOrder[scenarioName]) or math.huge
@@ -500,8 +520,8 @@ local function encodeLibraries(values)
             end
             for offsetIndex, offset in ipairs(groupedOffsets) do
                 local comma = offsetIndex < #groupedOffsets and ',' or ''
-                lines[#lines + 1] = ('        { "x": %s, "y": %s, "z": %s, "heading": %s }%s'):format(
-                    json.encode(offset.x), json.encode(offset.y), json.encode(offset.z), json.encode(offset.heading), comma)
+                lines[#lines + 1] = ('        { "id": %s, "x": %s, "y": %s, "z": %s, "heading": %s }%s'):format(
+                    json.encode(offset.id), json.encode(offset.x), json.encode(offset.y), json.encode(offset.z), json.encode(offset.heading), comma)
             end
             lines[#lines + 1] = '      ]' .. (groupIndex < #pointGroups and ',' or '')
         end
@@ -539,7 +559,10 @@ local function encodeItems()
     local lines = { '{' }
     for index, key in ipairs(keys) do
         local saved = libraries[key]
-        local assignment = saved.offset and { saved.preset, saved.offset } or saved.preset
+        local assignment = saved.preset
+        if saved.offset or (type(saved.coordOffsets) == 'table' and next(saved.coordOffsets)) then
+            assignment = { preset = saved.preset, offset = saved.offset, coordOffsets = saved.coordOffsets }
+        end
         lines[#lines + 1] = ('  %s: %s%s'):format(
             json.encode(tostring(saved.item)), json.encode(assignment), index < #keys and ',' or '')
     end
@@ -646,6 +669,7 @@ lib.callback.register('nt_actions:server:getObjectLibrary', function(source, mod
         library = getLibrary(model, false),
         preset = presetForModel(model),
         objectOffset = objectOffsetForModel(model),
+        coordOffsets = coordOffsetsForModel(model),
         canDelete = canManage(source),
         canEditPoseOffsets = canEditPoseOffsets(source),
         poseOffsets = poseOffsets,
@@ -664,7 +688,8 @@ end)
 lib.callback.register('nt_actions:server:applyObjectPreset', function(source, model, name)
     if not canManage(source) or not validModel(model) or type(name) ~= 'string' or not presets[name] then return false end
     local key, previous = tostring(model), libraries[tostring(model)]
-    libraries[key] = { item = model, preset = name, offset = previous and previous.offset or nil }
+    libraries[key] = { item = model, preset = name, offset = previous and previous.offset or nil,
+        coordOffsets = previous and previous.preset == name and previous.coordOffsets or nil }
     if not saveLibraries() then libraries[key] = previous return false end
     broadcastLibraryUpdate(model)
     return true
@@ -746,6 +771,25 @@ lib.callback.register('nt_actions:server:saveObjectOffset', function(source, mod
     TriggerClientEvent('nt_actions:client:objectLibraryUpdated', -1, model)
     return { offset = saved.offset }
 end)
+lib.callback.register('nt_actions:server:saveObjectCoordOffset', function(source, model, coordId, value)
+    if not validModel(model) or not canManage(source) then return false end
+    local saved, library = libraries[tostring(model)], getLibrary(model)
+    coordId = tonumber(coordId)
+    if not saved or not library or not coordId or coordId <= 0 or coordId % 1 ~= 0 then return false end
+    local exists = false
+    for _, point in ipairs(library.offsets) do if tonumber(point.id) == coordId then exists = true break end end
+    if not exists then return false end
+    local clean = normaliseOffset(value)
+    if not clean then return false end
+    saved.coordOffsets = type(saved.coordOffsets) == 'table' and saved.coordOffsets or {}
+    local key, previous = tostring(coordId), saved.coordOffsets[tostring(coordId)]
+    local isZero = math.abs(clean.x) <= 0.0001 and math.abs(clean.y) <= 0.0001
+        and math.abs(clean.z) <= 0.0001 and math.abs(clean.heading) <= 0.0001
+    saved.coordOffsets[key] = not isZero and clean or nil
+    if not saveLibraries() then saved.coordOffsets[key] = previous return false end
+    TriggerClientEvent('nt_actions:client:objectLibraryUpdated', -1, model)
+    return { offset = saved.coordOffsets[key] }
+end)
 lib.callback.register('nt_actions:server:saveObjectPose', function(source, model, groupName, scenarioName, value, mode, coordNumber, separate, pointGroup, presetName)
     if not validModel(model) or not validScenario(groupName, scenarioName) then return false end
     local cleanOffset = normaliseOffset(value)
@@ -771,6 +815,7 @@ lib.callback.register('nt_actions:server:saveObjectPose', function(source, model
             removeOffset(library, coordNumber)
             if selectedOffset > coordNumber then selectedOffset = selectedOffset - 1 end
         else
+            cleanOffset.id = library.offsets[coordNumber].id
             library.offsets[coordNumber] = cleanOffset
             selectedOffset = coordNumber
         end

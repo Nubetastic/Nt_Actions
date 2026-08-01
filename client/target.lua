@@ -10,6 +10,7 @@ local currentLibrary = { records = {}, offsets = {}, pointGroups = {}, pointGrou
 local currentPreset
 local poseOffsets = {}
 local currentObjectOffset
+local currentCoordOffsets = {}
 local canDeleteGroups = false
 local canEditPoseOffsets = false
 local cachedTargetModels = {}
@@ -93,11 +94,17 @@ end
 local function copyOffset(value)
     value = value or ConfigTarget.DefaultOffset or {}
     return {
+        id = tonumber(value.id),
         x = tonumber(value.x) or 0.0,
         y = tonumber(value.y) or 0.0,
         z = tonumber(value.z) or 0.0,
         heading = tonumber(value.heading) or 0.0,
     }
+end
+
+local function coordOffsetFor(pointOffset)
+    local id = pointOffset and tonumber(pointOffset.id)
+    return id and currentCoordOffsets[tostring(id)] or nil
 end
 
 local function rotatePoseXY(adjustment, pointHeading)
@@ -467,12 +474,15 @@ local function startScenarioInPlace(scenarioName, coords, heading)
     )
 end
 
-local function startScenario(entity, scenarioName, pointOffset, poseOffsetOverride, objectOffsetOverride)
+local function startScenario(entity, scenarioName, pointOffset, poseOffsetOverride, objectOffsetOverride, coordOffsetOverride)
     local adjustment = poseOffsetOverride
     if adjustment == nil then adjustment = poseOffsetFor(scenarioName) end
     local itemAdjustment = objectOffsetOverride
     if itemAdjustment == nil then itemAdjustment = currentObjectOffset end
-    local posePoint = combinedOffset(pointOffset, adjustment)
+    local coordAdjustment = coordOffsetOverride
+    if coordAdjustment == nil then coordAdjustment = coordOffsetFor(pointOffset) end
+    if coordAdjustment == false then coordAdjustment = nil end
+    local posePoint = combinedOffset(combinedOffset(pointOffset, coordAdjustment), adjustment)
     local coords, heading = scenarioTransform(entity, combinedOffset(itemAdjustment or {}, posePoint))
     return startScenarioAtTransform(scenarioName, coords, heading)
 end
@@ -653,6 +663,7 @@ local function refreshLibrary()
     currentLibrary = { records = records, offsets = offsets, pointGroups = pointGroups, pointGroupNames = pointGroupNames }
     currentPreset = type(response.preset) == 'string' and response.preset or nil
     currentObjectOffset = type(response.objectOffset) == 'table' and copyOffset(response.objectOffset) or nil
+    currentCoordOffsets = type(response.coordOffsets) == 'table' and response.coordOffsets or {}
     poseOffsets = type(response.poseOffsets) == 'table' and response.poseOffsets or poseOffsets
     canEditPoseOffsets = response.canEditPoseOffsets == true
     if activePose and activePose.model == selectedModel then
@@ -767,6 +778,12 @@ local function previewEditorScenario()
     if editorMode == 'objectOffset' then
         return startScenario(selectedObject, selectedScenario, editorPointOffset, nil, currentOffset)
     end
+    if editorMode == 'coordOffset' then
+        local point = combinedOffset(editorPointOffset, currentOffset)
+        local posePoint = combinedOffset(point, poseOffsetFor(selectedScenario))
+        local coords, heading = scenarioTransform(selectedObject, combinedOffset(currentObjectOffset or {}, posePoint))
+        return startScenarioAtTransform(selectedScenario, coords, heading)
+    end
     if editorScenarioInPlace then
         local posePoint = combinedOffset(currentOffset, poseOffsetFor(selectedScenario))
         local offset = combinedOffset(currentObjectOffset or {}, posePoint)
@@ -812,17 +829,20 @@ local function beginEditor(groupName, scenarioName, mode, coordNumber)
     local startInPlace = mode == 'add' and not useObjectOffset
     editorScenarioInPlace = startInPlace
     local savedOffset = mode == 'modify' and editorCoordNumber and currentLibrary.offsets[editorCoordNumber] or nil
-    local activeObjectOffset = (mode == 'add' or mode == 'poseOffset' or mode == 'objectOffset')
+    local activeObjectOffset = (mode == 'add' or mode == 'poseOffset' or mode == 'objectOffset' or mode == 'coordOffset')
         and activePose
         and activePose.entity == selectedObject
         and activePose.offset
         or nil
-    local selectedPointOffset = (mode == 'add' or mode == 'poseOffset' or mode == 'objectOffset') and currentLibrary.offsets[selectedMenuCoord] or nil
+    local selectedPointOffset = (mode == 'add' or mode == 'poseOffset' or mode == 'objectOffset' or mode == 'coordOffset')
+        and currentLibrary.offsets[editorCoordNumber or selectedMenuCoord] or nil
     editorPointOffset = copyOffset(activeObjectOffset or selectedPointOffset)
     currentOffset = mode == 'poseOffset'
         and copyOffset(poseOffsetFor(scenarioName) or {})
         or mode == 'objectOffset'
             and copyOffset(currentObjectOffset or {})
+            or mode == 'coordOffset'
+                and copyOffset(coordOffsetFor(selectedPointOffset) or {})
             or copyOffset(savedOffset or activeObjectOffset or selectedPointOffset)
     availablePointOffsets = {}
     editorOpening = true
@@ -837,7 +857,7 @@ local function beginEditor(groupName, scenarioName, mode, coordNumber)
         return
     end
 
-    if mode ~= 'poseOffset' and mode ~= 'objectOffset' then
+    if mode ~= 'poseOffset' and mode ~= 'objectOffset' and mode ~= 'coordOffset' then
         Wait(math.max(0, math.floor(tonumber(ConfigTarget.PointSearchDelay) or 3000)))
         if startInPlace then
             local settled = pedTransform(PlayerPedId())
@@ -851,7 +871,7 @@ local function beginEditor(groupName, scenarioName, mode, coordNumber)
         notify('That object is no longer available.', 'error')
         return
     end
-    if mode ~= 'poseOffset' and mode ~= 'objectOffset' then collectPointOffsets() end
+    if mode ~= 'poseOffset' and mode ~= 'objectOffset' and mode ~= 'coordOffset' then collectPointOffsets() end
 
     local gameplayCameraCoords = GetGameplayCamCoord()
     local objectCoords = GetEntityCoords(selectedObject)
@@ -859,13 +879,15 @@ local function beginEditor(groupName, scenarioName, mode, coordNumber)
         and combinedOffset(currentObjectOffset or {}, combinedOffset(editorPointOffset, currentOffset))
         or mode == 'objectOffset'
             and combinedOffset(currentOffset, combinedOffset(editorPointOffset, poseOffsetFor(scenarioName)))
+            or mode == 'coordOffset'
+                and combinedOffset(currentObjectOffset or {}, combinedOffset(combinedOffset(editorPointOffset, currentOffset), poseOffsetFor(scenarioName)))
             or combinedOffset(currentObjectOffset or {}, currentOffset)
     local _, heading = scenarioTransform(selectedObject, cameraOffset)
     if not manualObjectOffset then startFineTuneCamera(objectCoords, gameplayCameraCoords, heading) end
     fineTuneActive = true
     editorMoveSetActive = not manualObjectOffset
     editorOpening = false
-    if mode ~= 'poseOffset' and mode ~= 'objectOffset' then startPointScanner() end
+    if mode ~= 'poseOffset' and mode ~= 'objectOffset' and mode ~= 'coordOffset' then startPointScanner() end
     local cameraZoomMin = tonumber(ConfigTarget.CameraZoomMin) or 0.75
     local cameraZoomMax = math.max(cameraZoomMin, tonumber(ConfigTarget.CameraZoomMax) or 8.0, orbitRadius)
     SetNuiFocus(true, true)
@@ -875,6 +897,8 @@ local function beginEditor(groupName, scenarioName, mode, coordNumber)
             and (editorSettings.PoseOffsetTitle or 'Adjust global pose offset')
             or mode == 'objectOffset'
                 and (editorSettings.ObjectOffsetTitle or 'Adjust object offset')
+                or mode == 'coordOffset'
+                    and (editorSettings.CoordOffsetTitle or 'Adjust coordinate offset')
                 or (mode == 'modify' and (editorSettings.ModifyTitle or 'Modify point')
                 or (editorSettings.AddTitle or 'Add pose')),
         scale = NtMenu.getScale(),
@@ -889,8 +913,8 @@ local function beginEditor(groupName, scenarioName, mode, coordNumber)
         cameraZoomMax = cameraZoomMax,
         cameraZoomStep = ConfigTarget.CameraZoomStep,
         offset = currentOffset,
-        coordinates = (mode == 'poseOffset' or mode == 'objectOffset') and {} or currentLibrary.offsets,
-        selectedCoordinate = mode ~= 'poseOffset' and mode ~= 'objectOffset'
+        coordinates = (mode == 'poseOffset' or mode == 'objectOffset' or mode == 'coordOffset') and {} or currentLibrary.offsets,
+        selectedCoordinate = mode ~= 'poseOffset' and mode ~= 'objectOffset' and mode ~= 'coordOffset'
             and not (mode == 'add' and not useObjectOffset)
             and (editorCoordNumber or selectedMenuCoord)
             or nil,
@@ -1303,8 +1327,13 @@ openObjectMenu = function(entity, preserveSelectedPoint)
         end
         footer[#footer + 1] = {
             label = 'Object Offset',
-            disabled = not currentPreset,
+            disabled = not currentPreset or not isActiveObject or not activePose.coordNumber,
             args = { action = 'objectOffset' },
+        }
+        footer[#footer + 1] = {
+            label = 'Coord Offset',
+            disabled = not currentPreset or not isActiveObject or not activePose.coordNumber,
+            args = { action = 'coordOffset' },
         }
         footer[#footer + 1] = { label = 'Group Edit', args = { action = 'groupEdit' } }
         footer[#footer + 1] = {
@@ -1362,19 +1391,12 @@ openObjectMenu = function(entity, preserveSelectedPoint)
                 beginEditor(activePose.group, activePose.scenario, 'modify', activePose.coordNumber)
             elseif args.action == 'poseOffset' and activePose and activePose.coordNumber and canEditPoseOffsets then
                 beginEditor(activePose.group, activePose.scenario, 'poseOffset', activePose.coordNumber)
-            elseif args.action == 'objectOffset' and canDeleteGroups and currentPreset then
-                local record = activePose and activePose.entity == selectedObject and activePose or nil
-                if not record then
-                    local pointGroup = currentLibrary.pointGroups[selectedMenuCoord] or DEFAULT_POINT_GROUP
-                    for _, candidate in ipairs(currentLibrary.records or {}) do
-                        if candidate.visibility == 'show' and candidate.pointGroup == pointGroup then
-                            record = candidate
-                            break
-                        end
-                    end
-                end
-                beginEditor(record and record.group, record and record.scenario, 'objectOffset',
-                    record and record.coordNumber or selectedMenuCoord)
+            elseif args.action == 'objectOffset' and canDeleteGroups and currentPreset
+                and activePose and activePose.entity == selectedObject and activePose.coordNumber then
+                beginEditor(activePose.group, activePose.scenario, 'objectOffset', activePose.coordNumber)
+            elseif args.action == 'coordOffset' and canDeleteGroups and currentPreset
+                and activePose and activePose.entity == selectedObject and activePose.coordNumber then
+                beginEditor(activePose.group, activePose.scenario, 'coordOffset', activePose.coordNumber)
             elseif args.action == 'leave' then
                 leavePose()
                 objectMenuVisible = false
@@ -1531,7 +1553,8 @@ RegisterNUICallback('presetPreview', function(data, cb)
     if preset and scenarioName then
         for _, pose in ipairs(preset.poses) do if pose.scenario == scenarioName then valid = true break end end
     end
-    cb({ ok = valid and point and startScenario(selectedObject, scenarioName, point.offset) == true or false })
+    local coordOverride = preset and preset.active == true and nil or false
+    cb({ ok = valid and point and startScenario(selectedObject, scenarioName, point.offset, nil, nil, coordOverride) == true or false })
 end)
 
 RegisterNUICallback('presetApply', function(data, cb)
@@ -1692,7 +1715,7 @@ RegisterNUICallback('cameraZoom', function(data, cb)
 end)
 
 RegisterNUICallback('selectEditorCoord', function(data, cb)
-    if not fineTuneActive or editorMode == 'poseOffset' or editorMode == 'objectOffset' then cb({ ok = false }) return end
+    if not fineTuneActive or editorMode == 'poseOffset' or editorMode == 'objectOffset' or editorMode == 'coordOffset' then cb({ ok = false }) return end
     local coordNumber = tonumber(data.coordNumber)
     local selected = coordNumber and currentLibrary.offsets[coordNumber] or nil
     local pointIndex = tonumber(data.pointIndex)
@@ -1711,6 +1734,23 @@ end)
 
 RegisterNUICallback('confirm', function(data, cb)
     if not fineTuneActive then cb({ ok = false }) return end
+    if editorMode == 'coordOffset' then
+        local point = currentLibrary.offsets[editorCoordNumber or selectedMenuCoord]
+        local coordId = point and tonumber(point.id)
+        if not coordId or not currentOffset then cb({ ok = false }) return end
+        local saved = lib.callback.await('nt_actions:server:saveObjectCoordOffset', false, selectedModel, coordId, currentOffset)
+        if type(saved) ~= 'table' then
+            notify('The coordinate offset could not be saved.', 'error')
+            cb({ ok = false })
+            return
+        end
+        currentCoordOffsets[tostring(coordId)] = type(saved.offset) == 'table' and copyOffset(saved.offset) or nil
+        if activePose and activePose.entity == selectedObject then startScenario(activePose.entity, activePose.scenario, activePose.offset) end
+        closeFineTune()
+        notify('The coordinate offset was saved.', 'success')
+        cb({ ok = true })
+        return
+    end
     if editorMode == 'objectOffset' then
         local manualValue = editorOffsetValue(data)
         if manualValue then currentOffset = manualValue end
@@ -1729,7 +1769,8 @@ RegisterNUICallback('confirm', function(data, cb)
         notify('The object offset was saved.', 'success')
         cb({ ok = true })
         return
-    end    if editorMode == 'poseOffset' then
+    end
+    if editorMode == 'poseOffset' then
         local saved = lib.callback.await(
             'nt_actions:server:savePoseOffset', false, selectedGroup, selectedScenario, currentOffset)
         if type(saved) ~= 'table' then
