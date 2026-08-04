@@ -20,6 +20,30 @@ local function handleOpenPress()
     TriggerEvent('nt_actions:client:openCachedPoseList')
 end
 
+local poseMovementControls = {
+    0x4D8FB4C1, -- INPUT_MOVE_LR
+    0xFDA83190, -- INPUT_MOVE_UD
+    0x8FD015D8, -- INPUT_MOVE_UP_ONLY
+    0xD27782E3, -- INPUT_MOVE_DOWN_ONLY
+    0x7065027D, -- INPUT_MOVE_LEFT_ONLY
+    0xB4E465B4, -- INPUT_MOVE_RIGHT_ONLY
+    0x8FFC75D6, -- INPUT_SPRINT
+    0xD9D0E1C0, -- INPUT_JUMP
+}
+
+CreateThread(function()
+    while true do
+        if inPose == true then
+            for _, control in ipairs(poseMovementControls) do
+                DisableControlAction(0, control, true)
+            end
+            Wait(0)
+        else
+            Wait(250)
+        end
+    end
+end)
+
 CreateThread(function()
     while true do
         Wait(4)

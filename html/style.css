@@ -119,8 +119,10 @@ button, input, output { font: inherit; }
 .nav-scale-control output { min-width: 42px; color: var(--gold-soft); text-align: right; }
 .nav-description { display: none; min-height: 48px; margin: 0 4px 12px; padding: 10px 12px; border: 1px solid var(--line-soft); border-radius: 3px; background: rgba(12, 10, 8, .82); color: var(--muted); font-size: 15px; line-height: 1.35; }
 .nav-description.visible { display: block; }
-.nav-review-camera { display: none; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; margin: 0 4px 12px; color: var(--muted); font-size: 13px; }
+.nav-review-camera { display: none; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 7px 9px; margin: 0 4px 12px; color: var(--muted); font-size: 13px; }
 .nav-review-camera.visible { display: grid; }
+.nav-camera-instructions { grid-column: 1 / -1; }
+.nav-review-camera input { width: 100%; min-width: 0; }
 .nav-review-camera output { min-width: 48px; color: var(--gold-soft); text-align: right; }
 .nav-point-group { margin: 8px 2px 2px; padding: 5px 2px; border-bottom: 1px solid var(--line-soft); color: var(--gold); font-size: 13px; font-weight: 700; letter-spacing: .06em; }
 .nav-group-edit { display: none; margin: 8px 10px 10px; padding: 8px; border: 1px solid #776a50; border-radius: 3px; background: var(--control); color: var(--gold-soft); cursor: pointer; font-weight: 700; }

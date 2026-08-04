@@ -35,6 +35,8 @@ local presetEditorActive = false
 local presetCache = {}
 local cameraLookActive = false
 local fineTuneCamera
+local poseMenuCamera
+local poseMenuCameraLookActive = false
 local orbitRadius = 1.0
 local orbitYaw = 0.0
 local orbitPitch = 0.0
@@ -707,6 +709,73 @@ local function positionOrbitCamera(camera, target)
     PointCamAtCoord(camera, target.x, target.y, target.z)
 end
 
+local function stopPoseMenuCamera(immediate)
+    poseMenuCameraLookActive = false
+    if not poseMenuCamera then return end
+    local camera = poseMenuCamera
+    poseMenuCamera = nil
+    local transition = immediate and 0 or (tonumber(ConfigTarget.CameraTransition) or 250)
+    RenderScriptCams(false, not immediate, transition, true, true)
+    CreateThread(function()
+        if transition > 0 then Wait(transition) end
+        if DoesCamExist(camera) then DestroyCam(camera, false) end
+    end)
+end
+
+local function startPoseMenuCamera(scenarioHeading)
+    stopPoseMenuCamera(true)
+    local target = cameraTargetCoords()
+    local gameplayCameraCoords = GetGameplayCamCoord()
+    local horizontal = math.sqrt(((gameplayCameraCoords.x - target.x) ^ 2) + ((gameplayCameraCoords.y - target.y) ^ 2))
+    local minimumPitch = math.rad(tonumber(ConfigTarget.CameraMinPitch) or -60.0)
+    local maximumPitch = math.rad(tonumber(ConfigTarget.CameraMaxPitch) or 75.0)
+    local minimum = tonumber(ConfigTarget.CameraZoomMin) or 0.75
+    local maximum = math.max(minimum, tonumber(ConfigTarget.CameraZoomMax) or 8.0)
+    orbitRadius = math.max(minimum, math.min(maximum, tonumber(editorSettings.DefaultCameraZoom) or 3.0))
+    orbitYaw = math.rad((scenarioHeading or GetEntityHeading(PlayerPedId())) - 90.0)
+    orbitPitch = math.max(minimumPitch, math.min(maximumPitch, math.atan(gameplayCameraCoords.z - target.z, horizontal)))
+    poseMenuCamera = CreateCam('DEFAULT_SCRIPTED_CAMERA', true)
+    SetCamFov(poseMenuCamera, tonumber(ConfigTarget.CameraFov) or 50.0)
+    positionOrbitCamera(poseMenuCamera, target)
+    SetCamActive(poseMenuCamera, true)
+    RenderScriptCams(true, true, tonumber(ConfigTarget.CameraTransition) or 250, true, true)
+    local camera = poseMenuCamera
+    CreateThread(function()
+        while poseMenuCamera == camera and DoesCamExist(camera) do
+            target = cameraTargetCoords()
+            if poseMenuCameraLookActive then
+                local sensitivity = math.rad(tonumber(ConfigTarget.CameraOrbitSensitivity) or 4.0)
+                orbitYaw = orbitYaw - (GetControlNormal(0, ConfigTarget.CameraLookX or 0xA987235F) * sensitivity)
+                orbitPitch = math.max(minimumPitch, math.min(maximumPitch, orbitPitch + (GetControlNormal(0, ConfigTarget.CameraLookY or 0xD2047988) * sensitivity)))
+            end
+            positionOrbitCamera(camera, target)
+            Wait(0)
+        end
+    end)
+end
+
+local function beginPoseMenuCameraLook()
+    if not objectMenuVisible or poseMenuCameraLookActive or not poseMenuCamera then return end
+    poseMenuCameraLookActive = true
+    SetNuiFocus(false, false)
+    CreateThread(function()
+        local control = ConfigTarget.CameraControl or 0xF84FA74F
+        local detected = false
+        local timeout = GetGameTimer() + (tonumber(ConfigTarget.CameraHoldDetectionTimeout) or 5000)
+        while objectMenuVisible and poseMenuCameraLookActive and poseMenuCamera do
+            DisableControlAction(0, control, true)
+            local pressed = IsDisabledControlPressed(0, control) or IsControlPressed(0, control)
+            if pressed then detected = true end
+            if (detected and not pressed) or (not detected and GetGameTimer() > timeout) then break end
+            Wait(0)
+        end
+        poseMenuCameraLookActive = false
+        if objectMenuVisible and poseMenuCamera then
+            SetNuiFocus(true, true)
+            SendNUIMessage({ action = 'cameraEnd' })
+        end
+    end)
+end
 local function stopFineTuneCamera(immediate)
     if not fineTuneCamera then return end
     local camera = fineTuneCamera
@@ -1263,6 +1332,7 @@ local function closeGroupEditor(reopenMenu)
 end
 openObjectMenu = function(entity, preserveSelectedPoint)
     if fineTuneActive or not targetableObject(entity) then return end
+    stopPoseMenuCamera(true)
     local objectChanged = selectedObject ~= entity
     if objectChanged then
         modModeActive = false
@@ -1371,14 +1441,29 @@ openObjectMenu = function(entity, preserveSelectedPoint)
             footer[#footer + 1] = { label = configuredText('Exit', 'Exit'), wide = true, args = { action = 'exit' } }
         end
     end
+    local showPoseCamera = isActiveObject and not modModeActive
     NtMenu.open(configuredText('ObjectTitle', 'Object Poses'), options, function(_, args)
         if args.action == 'pose' then usePose(args.group, args.scenario, selectedMenuCoord) end
     end, function()
         objectMenuVisible = false
+        stopPoseMenuCamera(false)
     end, {
         footerActions = footer,
         showMod = canDeleteGroups or canEditPoseOffsets,
         modActive = modModeActive,
+        showReviewCamera = showPoseCamera,
+        reviewCameraDistance = tonumber(editorSettings.DefaultCameraZoom) or 3.0,
+        reviewCameraMin = tonumber(ConfigTarget.CameraZoomMin) or 0.75,
+        reviewCameraMax = tonumber(ConfigTarget.CameraZoomMax) or 8.0,
+        reviewCameraStep = tonumber(ConfigTarget.CameraZoomStep) or 0.25,
+        onReviewZoom = function(distance)
+            if not poseMenuCamera or not DoesCamExist(poseMenuCamera) then return end
+            local minimum = tonumber(ConfigTarget.CameraZoomMin) or 0.75
+            local maximum = math.max(minimum, tonumber(ConfigTarget.CameraZoomMax) or 8.0)
+            orbitRadius = math.max(minimum, math.min(maximum, tonumber(distance) or orbitRadius))
+            positionOrbitCamera(poseMenuCamera, cameraTargetCoords())
+        end,
+        onCameraLook = beginPoseMenuCameraLook,
         onMod = function()
             modModeActive = not modModeActive
             NtMenu.hide(false)
@@ -1463,6 +1548,12 @@ openObjectMenu = function(entity, preserveSelectedPoint)
             openObjectMenu(selectedObject)
         end,
     })
+    if showPoseCamera then
+        local cameraOffset = combinedOffset(currentObjectOffset or {}, combinedOffset(activePose.offset,
+            combinedOffset(coordOffsetFor(activePose.offset) or {}, poseOffsetFor(activePose.scenario))))
+        local _, heading = scenarioTransform(selectedObject, cameraOffset)
+        startPoseMenuCamera(heading)
+    end
 end
 
 AddEventHandler('nt_actions:client:openCachedPoseList', function()
@@ -1473,6 +1564,9 @@ AddEventHandler('nt_actions:client:openCachedPoseList', function()
     openObjectMenu(cachedPoseObject)
 end)
 
+AddEventHandler('nt_actions:client:setMenuOpen', function(open)
+    if not open and poseMenuCamera then stopPoseMenuCamera(false) end
+end)
 RegisterNetEvent('nt_actions:client:poseOffsetUpdated', function(scenarioName, offset)
     if type(scenarioName) ~= 'string' then return end
     poseOffsets[scenarioName] = type(offset) == 'table' and copyOffset(offset) or nil

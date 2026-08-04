@@ -6,7 +6,7 @@ A RedM object-pose library for publishing reusable poses and object-relative poi
 
 ## Usage
 
-Target an object with **ox_target** and select **Object poses**. Choose a numbered point, then select a pose. While posed, press **L** (`Config.StartKey`) to reopen the cached pose menu.
+Target an object with **ox_target** and select **Object poses**. Choose a numbered point, then select a pose. While posed, press **L** (`Config.StartKey`) to reopen the cached pose menu. The regular player pose menu includes a camera-distance slider; hold the right mouse button and move the mouse to orbit around the player.
 
 - **Leave Pose** exits the scenario and returns the player to their original position.
 - The point list is organized by point group. Poses shown for the selected point belong to that point's group.
