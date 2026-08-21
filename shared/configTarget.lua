@@ -7,7 +7,7 @@ ConfigTarget = {
     -- On-duty jobs listed here may target unregistered objects, toggle Mod, and manage libraries.
     AdminJobs = {
         "admin",
-        "actionsMod",
+        "actionsmod",
     },
 
     -- Jobs allowed to use Batch Upload Review, separate from AdminJobs.
