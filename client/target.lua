@@ -732,7 +732,7 @@ local function startPoseMenuCamera(scenarioHeading)
     local minimum = tonumber(ConfigTarget.CameraZoomMin) or 0.75
     local maximum = math.max(minimum, tonumber(ConfigTarget.CameraZoomMax) or 8.0)
     orbitRadius = math.max(minimum, math.min(maximum, tonumber(editorSettings.DefaultCameraZoom) or 3.0))
-    orbitYaw = math.rad((scenarioHeading or GetEntityHeading(PlayerPedId())) - 90.0)
+    orbitYaw = math.rad((scenarioHeading or GetEntityHeading(PlayerPedId())) + 90.0)
     orbitPitch = math.max(minimumPitch, math.min(maximumPitch, math.atan(gameplayCameraCoords.z - target.z, horizontal)))
     poseMenuCamera = CreateCam('DEFAULT_SCRIPTED_CAMERA', true)
     SetCamFov(poseMenuCamera, tonumber(ConfigTarget.CameraFov) or 50.0)
@@ -800,7 +800,7 @@ local function startFineTuneCamera(anchor, gameplayCameraCoords, scenarioHeading
     local zoomMin = tonumber(ConfigTarget.CameraZoomMin) or 0.75
     local zoomMax = math.max(zoomMin, tonumber(ConfigTarget.CameraZoomMax) or 8.0)
     orbitRadius = math.max(zoomMin, math.min(zoomMax, tonumber(editorSettings.DefaultCameraZoom) or 3.0))
-    orbitYaw = math.rad((scenarioHeading or 0.0) - 90.0)
+    orbitYaw = math.rad((scenarioHeading or 0.0) + 90.0)
     orbitPitch = math.max(minimumPitch, math.min(maximumPitch, math.atan(currentHeight, horizontal)))
 
     fineTuneCamera = CreateCam('DEFAULT_SCRIPTED_CAMERA', true)

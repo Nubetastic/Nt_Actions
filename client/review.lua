@@ -61,7 +61,7 @@ end
 local function startCamera()
     stopCamera()
     cameraRadius = tonumber(settings.CameraDistance) or 3.0
-    cameraYaw = math.rad(GetEntityHeading(PlayerPedId()) - 90.0)
+    cameraYaw = math.rad(GetEntityHeading(PlayerPedId()) + 90.0)
     cameraPitch = 0.15
     reviewCamera = CreateCam('DEFAULT_SCRIPTED_CAMERA', true)
     SetCamFov(reviewCamera, tonumber(ConfigTarget.CameraFov) or 50.0)
